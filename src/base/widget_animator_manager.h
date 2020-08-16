@@ -3,7 +3,7 @@
  * Author: AWTK Develop Team
  * Brief:  animator manager
  *
- * Copyright (c) 2018 - 2019  Guangzhou ZHIYUAN Electronics Co.,Ltd.
+ * Copyright (c) 2018 - 2020  Guangzhou ZHIYUAN Electronics Co.,Ltd.
  *
  * This program is distributed in the hope that it will be useful,
  * but WITHOUT ANY WARRANTY; without even the implied warranty of
@@ -27,7 +27,7 @@
 BEGIN_C_DECLS
 
 /**
- * @class widget_animator_t
+ * @class widget_animator_manager_t
  * 控件动画管理器。
  */
 struct _widget_animator_manager_t {
@@ -169,6 +169,18 @@ ret_t widget_animator_manager_stop(widget_animator_manager_t* am, widget_t* widg
  */
 ret_t widget_animator_manager_pause(widget_animator_manager_t* am, widget_t* widget,
                                     const char* name);
+
+/**
+ * @method widget_animator_manager_find
+ * 查找满足条件的动画。
+ * @param {widget_animator_manager_t*} am 控件动画管理器。
+ * @param {widget_t*} widget 控件对象。
+ * @param {const char*} name 动画名称。
+ *
+ * @return {widget_animator_t*} 成功返回动画对象，失败返回NULL。
+ */
+widget_animator_t* widget_animator_manager_find(widget_animator_manager_t* am, widget_t* widget,
+                                                const char* name);
 /**
  * @method widget_animator_manager_remove_all
  * 销毁满足条件的动画。

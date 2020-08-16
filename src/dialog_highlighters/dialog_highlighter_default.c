@@ -3,7 +3,7 @@
  * Author: AWTK Develop Team
  * Brief:  dialog_highlighter
  *
- * Copyright (c) 2018 - 2019  Guangzhou ZHIYUAN Electronics Co.,Ltd.
+ * Copyright (c) 2018 - 2020  Guangzhou ZHIYUAN Electronics Co.,Ltd.
  *
  * This program is distributed in the hope that it will be useful,
  * but WITHOUT ANY WARRANTY; without even the implied highlighterrranty of
@@ -19,9 +19,9 @@
  *
  */
 
-#include "base/window_manager.h"
 #include "base/dialog_highlighter.h"
 #include "dialog_highlighters/dialog_highlighter_default.h"
+#include "window_manager/window_manager_default.h"
 
 static ret_t dialog_highlighter_default_draw_mask(canvas_t* c, uint8_t alpha) {
   if (alpha > 1) {
@@ -33,7 +33,7 @@ static ret_t dialog_highlighter_default_draw_mask(canvas_t* c, uint8_t alpha) {
     canvas_fill_rect(c, 0, 0, w, h);
   }
 
-  return alpha;
+  return RET_OK;
 }
 
 static ret_t dialog_highlighter_default_prepare(dialog_highlighter_t* h, canvas_t* c) {
@@ -53,6 +53,8 @@ static ret_t dialog_highlighter_default_prepare(dialog_highlighter_t* h, canvas_
 }
 
 static ret_t dialog_highlighter_default_draw(dialog_highlighter_t* h, float_t percent) {
+  rect_t r;
+  rect_t save_r;
   canvas_t* c = h->canvas;
   bitmap_t* img = &(h->img);
   rect_t src = rect_init(0, 0, img->w, img->h);
@@ -64,7 +66,11 @@ static ret_t dialog_highlighter_default_draw(dialog_highlighter_t* h, float_t pe
     canvas_draw_image(c, img, &src, &dst);
     window_manager_paint_system_bar(window_manager(), c);
   } else {
-    lcd_draw_image(c->lcd, img, &src, &dst);
+    canvas_get_clip_rect(c, &save_r);
+    r = rect_intersect(&save_r, &h->clip_rect);
+    canvas_set_clip_rect(c, &r);
+    canvas_draw_image(c, img, &src, &dst);
+    canvas_set_clip_rect(c, &save_r);
   }
 
   /*
@@ -78,11 +84,18 @@ static ret_t dialog_highlighter_default_draw(dialog_highlighter_t* h, float_t pe
   return RET_OK;
 }
 
+static bool_t dialog_highlighter_default_is_dynamic(dialog_highlighter_t* h) {
+  dialog_highlighter_default_t* dh = (dialog_highlighter_default_t*)h;
+
+  return (dh->start_alpha != dh->end_alpha);
+}
+
 static const dialog_highlighter_vtable_t s_dialog_highlighter_default_vt = {
     .type = "dialog_highlighter_default_t",
     .desc = "dialog_highlighter_default_t",
     .size = sizeof(dialog_highlighter_default_t),
     .prepare = dialog_highlighter_default_prepare,
+    .is_dynamic = dialog_highlighter_default_is_dynamic,
     .draw = dialog_highlighter_default_draw};
 
 dialog_highlighter_t* dialog_highlighter_default_create(object_t* args) {

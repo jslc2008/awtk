@@ -3,7 +3,7 @@
  * Author: AWTK Develop Team
  * Brief:  timer manager
  *
- * Copyright (c) 2018 - 2019  Guangzhou ZHIYUAN Electronics Co.,Ltd.
+ * Copyright (c) 2018 - 2020  Guangzhou ZHIYUAN Electronics Co.,Ltd.
  *
  * This program is distributed in the hope that it will be useful,
  * but WITHOUT ANY WARRANTY; without even the implied warranty of
@@ -22,7 +22,7 @@
 #ifndef TK_TIMER_H
 #define TK_TIMER_H
 
-#include "base/timer_manager.h"
+#include "tkc/timer_manager.h"
 
 BEGIN_C_DECLS
 
@@ -51,14 +51,14 @@ BEGIN_C_DECLS
  */
 
 /**
- * @method timer_init
+ * @method timer_prepare
  * 初始化定时器系统。
  * @annotation ["private", "static"]
  * @param {timer_get_time_t} get_time 获取当前时间的函数。
  *
  * @return {ret_t} 返回RET_OK表示成功，否则表示失败。
  */
-ret_t timer_init(timer_get_time_t get_time);
+ret_t timer_prepare(timer_get_time_t get_time);
 
 /**
  * @method timer_add
@@ -106,6 +106,17 @@ ret_t timer_remove(uint32_t timer_id);
 ret_t timer_reset(uint32_t timer_id);
 
 /**
+ * @method timer_modify
+ * 修改指定的timer的duration，修改之后定时器重新开始计时。
+ * @annotation ["scriptable", "static"]
+ * @param {uint32_t} timer_id timerID。
+ * @param {uint32_t} duration 新的时间。
+ *
+ * @return {ret_t} 返回RET_OK表示成功，否则表示失败。
+ */
+ret_t timer_modify(uint32_t timer_id, uint32_t duration);
+
+/**
  * @method timer_set_on_destroy
  * 设置一个回调函数，在timer被销毁时调用(方便脚本语言去释放回调函数)。
  * @param {uint32_t} timer_id timerID。
@@ -151,15 +162,6 @@ uint32_t timer_count(void);
  * @return {uint32_t} 返回最近的timer到期时间。
  */
 uint32_t timer_next_time(void);
-
-/**
- * @method timer_now
- * 获取当前时间(ms)。
- * @annotation ["static"]
- *
- * @return {uint32_t} 返回获取当前时间(ms)。
- */
-uint32_t timer_now(void);
 
 END_C_DECLS
 

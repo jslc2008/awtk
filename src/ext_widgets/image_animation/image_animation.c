@@ -3,7 +3,7 @@
  * Author: AWTK Develop Team
  * Brief:  image_animation
  *
- * Copyright (c) 2018 - 2019  Guangzhou ZHIYUAN Electronics Co.,Ltd.
+ * Copyright (c) 2018 - 2020  Guangzhou ZHIYUAN Electronics Co.,Ltd.
  *
  * This program is distributed in the hope that it will be useful,
  * but WITHOUT ANY WARRANTY; without even the implied warranty of
@@ -26,11 +26,15 @@
 #include "base/image_manager.h"
 #include "image_animation/image_animation.h"
 
+static ret_t image_animation_start_init_if_not_inited(widget_t* widget);
+
 ret_t image_animation_get_image_name(image_animation_t* image_animation,
                                      char name[TK_NAME_LEN + 1]) {
   memset(name, 0x00, TK_NAME_LEN + 1);
   if (image_animation->sequence != NULL) {
     tk_strncpy(name, image_animation->image, TK_NAME_LEN);
+    image_animation->index =
+        image_animation->index >= strlen(image_animation->sequence) ? 0 : image_animation->index;
     name[strlen(name)] = image_animation->sequence[image_animation->index];
   } else {
     const char* format = image_animation->format ? image_animation->format : "%s%d";
@@ -44,12 +48,17 @@ ret_t image_animation_get_image_name(image_animation_t* image_animation,
 
 static ret_t on_idle_unload_image(const idle_info_t* info) {
   bitmap_t bitmap;
-  widget_t* widget = WIDGET(info->ctx);
-  image_animation_t* image_animation = IMAGE_ANIMATION(info->ctx);
+  widget_t* widget = NULL;
+  image_animation_t* image_animation = NULL;
+  return_value_if_fail(info != NULL, RET_REMOVE);
 
-  if (image_animation->image_data != NULL) {
+  widget = WIDGET(info->ctx);
+  image_animation = IMAGE_ANIMATION(info->ctx);
+  return_value_if_fail(widget != NULL && image_animation != NULL, RET_REMOVE);
+
+  if (image_animation->image_buffer != NULL) {
     memset(&bitmap, 0x00, sizeof(bitmap));
-    bitmap.data = image_animation->image_data;
+    bitmap.buffer = (graphic_buffer_t*)(image_animation->image_buffer);
     widget_unload_image(widget, &bitmap);
   }
 
@@ -59,20 +68,21 @@ static ret_t on_idle_unload_image(const idle_info_t* info) {
 static ret_t image_animation_load_image(image_animation_t* image_animation, bitmap_t* bitmap) {
   char name[TK_NAME_LEN + 1];
   widget_t* widget = WIDGET(image_animation);
+  return_value_if_fail(widget != NULL && image_animation != NULL && bitmap != NULL, RET_BAD_PARAMS);
 
   image_animation_get_image_name(image_animation, name);
-  if (widget_load_image(widget, name, bitmap) == RET_OK) {
-    tk_strncpy(image_animation->image_name, name, TK_NAME_LEN);
-    return RET_OK;
-  }
 
-  /*use old one*/
-  return widget_load_image(widget, image_animation->image_name, bitmap);
+  tk_strncpy(image_animation->image_name, name, TK_NAME_LEN);
+
+  return widget_load_image(widget, name, bitmap);
 }
 
 static ret_t image_animation_on_paint_self(widget_t* widget, canvas_t* c) {
   image_animation_t* image_animation = IMAGE_ANIMATION(widget);
-  return_value_if_fail(image_animation->image != NULL, RET_BAD_PARAMS);
+  return_value_if_fail(widget != NULL && image_animation != NULL && image_animation->image != NULL,
+                       RET_BAD_PARAMS);
+
+  image_animation_start_init_if_not_inited(widget);
 
   if (image_animation->index >= 0) {
     bitmap_t bitmap;
@@ -83,6 +93,7 @@ static ret_t image_animation_on_paint_self(widget_t* widget, canvas_t* c) {
       canvas_draw_image_scale_down(c, &bitmap, &s, &d);
 
       if (image_animation->unload_after_paint) {
+        image_animation->image_buffer = (bitmap.buffer);
         idle_add(on_idle_unload_image, widget);
       }
     }
@@ -160,12 +171,13 @@ static ret_t image_animation_set_prop(widget_t* widget, const char* name, const 
 
 static ret_t image_animation_on_destroy(widget_t* widget) {
   image_animation_t* image_animation = IMAGE_ANIMATION(widget);
+  return_value_if_fail(widget != NULL && image_animation != NULL, RET_BAD_PARAMS);
 
   if (image_animation->timer_id != TK_INVALID_ID) {
     timer_remove(image_animation->timer_id);
     image_animation->timer_id = TK_INVALID_ID;
   }
-  image_animation->image_data = NULL;
+  image_animation->image_buffer = NULL;
   TKMEM_FREE(image_animation->image);
   TKMEM_FREE(image_animation->sequence);
   TKMEM_FREE(image_animation->format);
@@ -192,8 +204,13 @@ TK_DECL_VTABLE(image_animation) = {.size = sizeof(image_animation_t),
                                    .on_paint_self = image_animation_on_paint_self};
 
 static ret_t image_animation_delay_play(const timer_info_t* info) {
-  widget_t* widget = WIDGET(info->ctx);
-  image_animation_t* image_animation = IMAGE_ANIMATION(widget);
+  widget_t* widget = NULL;
+  image_animation_t* image_animation = NULL;
+  return_value_if_fail(info != NULL, RET_REMOVE);
+
+  widget = WIDGET(info->ctx);
+  image_animation = IMAGE_ANIMATION(widget);
+  return_value_if_fail(widget != NULL && image_animation != NULL, RET_REMOVE);
 
   image_animation->timer_id = TK_INVALID_ID;
   image_animation_play(widget);
@@ -201,24 +218,27 @@ static ret_t image_animation_delay_play(const timer_info_t* info) {
   return RET_REMOVE;
 }
 
-static ret_t image_animation_on_open(void* ctx, event_t* e) {
-  widget_t* widget = WIDGET(ctx);
+static ret_t image_animation_start_init_if_not_inited(widget_t* widget) {
   image_animation_t* image_animation = IMAGE_ANIMATION(widget);
+  return_value_if_fail(widget != NULL && image_animation != NULL, RET_BAD_PARAMS);
 
-  if (image_animation->auto_play) {
-    if (image_animation->delay > 0) {
-      image_animation->timer_id =
-          timer_add(image_animation_delay_play, widget, image_animation->delay);
-    } else {
-      image_animation_play(widget);
+  if (!(image_animation->inited)) {
+    if (image_animation->auto_play) {
+      if (image_animation->delay > 0) {
+        image_animation->timer_id =
+            timer_add(image_animation_delay_play, widget, image_animation->delay);
+      } else {
+        image_animation_play(widget);
+      }
     }
+
+    image_animation->inited = TRUE;
   }
 
-  return RET_REMOVE;
+  return RET_OK;
 }
 
 widget_t* image_animation_create(widget_t* parent, xy_t x, xy_t y, wh_t w, wh_t h) {
-  widget_t* win = widget_get_window(parent);
   widget_t* widget = widget_create(parent, TK_REF_VTABLE(image_animation), x, y, w, h);
   image_animation_t* image_animation = IMAGE_ANIMATION(widget);
 
@@ -230,7 +250,6 @@ widget_t* image_animation_create(widget_t* parent, xy_t x, xy_t y, wh_t w, wh_t 
   image_animation->interval = 16;
   image_animation->loop = TRUE;
   image_animation->auto_play = FALSE;
-  widget_on(win, EVT_WINDOW_WILL_OPEN, image_animation_on_open, image_animation);
 
   return widget;
 }
@@ -293,9 +312,14 @@ ret_t image_animation_set_sequence(widget_t* widget, const char* sequence) {
   image_animation_t* image_animation = IMAGE_ANIMATION(widget);
   return_value_if_fail(image_animation != NULL && sequence != NULL, RET_BAD_PARAMS);
 
-  image_animation->sequence = tk_str_copy(image_animation->sequence, sequence);
+  if (sequence != NULL && sequence[0] != '\0') {
+    image_animation->sequence = tk_str_copy(image_animation->sequence, sequence);
+  } else {
+    TKMEM_FREE(image_animation->sequence);
+    image_animation->sequence = NULL;
+  }
 
-  return RET_OK;
+  return widget_invalidate(widget, NULL);
 }
 
 ret_t image_animation_set_range_sequence(widget_t* widget, uint32_t start_index,
@@ -320,17 +344,20 @@ static ret_t image_animation_restart(image_animation_t* image_animation) {
   return RET_REPEAT;
 }
 
-static ret_t image_animation_next(image_animation_t* image_animation) {
-  ret_t ret = RET_REMOVE;
+ret_t image_animation_next(widget_t* widget) {
+  ret_t ret = RET_DONE;
+  image_animation_t* image_animation = IMAGE_ANIMATION(widget);
+  return_value_if_fail(image_animation != NULL, RET_BAD_PARAMS);
+
   if (image_animation->sequence) {
-    if (image_animation->sequence[image_animation->index + 1]) {
+    if (image_animation->index + 1 < strlen(image_animation->sequence)) {
       image_animation->index++;
-      ret = RET_REPEAT;
+      ret = RET_OK;
     }
   } else {
     if (image_animation->index < image_animation->end_index) {
       image_animation->index++;
-      ret = RET_REPEAT;
+      ret = RET_OK;
     }
   }
 
@@ -340,14 +367,14 @@ static ret_t image_animation_next(image_animation_t* image_animation) {
 ret_t image_animation_update(widget_t* widget) {
   ret_t ret = RET_REMOVE;
   image_animation_t* image_animation = IMAGE_ANIMATION(widget);
-  return_value_if_fail(image_animation->image != NULL, RET_REMOVE);
+  return_value_if_fail(image_animation != NULL && image_animation->image != NULL, RET_REMOVE);
 
   if (image_animation->index < 0) {
     ret = image_animation_restart(image_animation);
   } else {
-    ret = image_animation_next(image_animation);
+    ret = image_animation_next(widget);
 
-    if (ret == RET_REMOVE) {
+    if (ret == RET_DONE) {
       if (image_animation->loop) {
         event_t e = event_init(EVT_ANIM_ONCE, widget);
         widget_dispatch(widget, &e);
@@ -359,6 +386,8 @@ ret_t image_animation_update(widget_t* widget) {
 
         widget_dispatch(widget, &e);
       }
+    } else {
+      ret = RET_REPEAT;
     }
   }
 
@@ -411,7 +440,12 @@ ret_t image_animation_set_format(widget_t* widget, const char* format) {
   image_animation_t* image_animation = IMAGE_ANIMATION(widget);
   return_value_if_fail(image_animation != NULL && format != NULL, RET_BAD_PARAMS);
 
-  image_animation->format = tk_str_copy(image_animation->format, format);
+  if (format != NULL && format[0] != '\0') {
+    image_animation->format = tk_str_copy(image_animation->format, format);
+  } else {
+    TKMEM_FREE(image_animation->format);
+    image_animation->format = NULL;
+  }
 
   return widget_invalidate(widget, NULL);
 }

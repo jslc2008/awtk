@@ -3,7 +3,7 @@
  * Author: AWTK Develop Team
  * Brief:  system info
  *
- * Copyright (c) 2018 - 2019  Guangzhou ZHIYUAN Electronics Co.,Ltd.
+ * Copyright (c) 2018 - 2020  Guangzhou ZHIYUAN Electronics Co.,Ltd.
  *
  * This program is distributed in the hope that it will be useful,
  * but WITHOUT ANY WARRANTY; without even the implied warranty of
@@ -32,7 +32,7 @@ BEGIN_C_DECLS
  * @parent object_t
  * 当前系统的信息。
  */
-typedef struct _system_info_t {
+struct _system_info_t {
   object_t object;
 
   /**
@@ -69,6 +69,13 @@ typedef struct _system_info_t {
    * 字体缩放比例，用于实现字体整体放大。
    */
   float_t font_scale;
+
+  /**
+   * @property {const char*} default_font
+   * @annotation ["readable"]
+   * 缺省字体。
+   */
+  const char* default_font;
 
   /**
    * @property {lcd_orientation_t} lcd_orientation
@@ -120,8 +127,8 @@ typedef struct _system_info_t {
    * @annotation ["readable"]
    * 应用程序的根目录，用于定位资源文件。
    */
-  const char* app_root;
-} system_info_t;
+  char* app_root;
+};
 
 /**
  * @method system_info
@@ -163,6 +170,17 @@ ret_t system_info_deinit(void);
  * @return {ret_t} 返回RET_OK表示成功，否则表示失败。
  */
 ret_t system_info_set_font_scale(system_info_t* info, float_t font_scale);
+
+/**
+ * @method system_info_set_default_font
+ * 设置缺省字体。
+ *
+ * @param {system_info_t* info} info system_info对象。
+ * @param {const char*} default_font 缺省字体。
+ *
+ * @return {ret_t} 返回RET_OK表示成功，否则表示失败。
+ */
+ret_t system_info_set_default_font(system_info_t* info, const char* default_font);
 
 /**
  * @method system_info_set_lcd_w
@@ -219,6 +237,16 @@ ret_t system_info_set_lcd_orientation(system_info_t* info, lcd_orientation_t lcd
  */
 ret_t system_info_set_device_pixel_ratio(system_info_t* info, float_t device_pixel_ratio);
 
+/**
+ * @method system_info_fix_font_name
+ * 修正字体名称，如果为NULL，返回缺省字体。
+ *
+ * @param {const char*} name 字体名称。
+ *
+ * @return {const char*} 返回有效的字体名称。
+ */
+const char* system_info_fix_font_name(const char* name);
+
 #define SYSTEM_INFO(obj) ((system_info_t*)(obj))
 
 #define SYSTEM_INFO_PROP_LCD_W "lcd_w"
@@ -235,7 +263,16 @@ ret_t system_info_set_device_pixel_ratio(system_info_t* info, float_t device_pix
 #define SYSTEM_INFO_PROP_LANGUAGE "language"
 #define SYSTEM_INFO_PROP_COUNTRY "country"
 
-/*public for test*/
+/**
+ * @method system_info_create
+ * 创建system_info对象。
+ * @annotation ["static"]
+ * @param {app_type_t} app_type 应用程序的类型。
+ * @param {const char*} app_name 应用程序的名称。
+ * @param {const char*} app_root 应用程序的根目录，用于定位资源文件。
+ *
+ * @return {system_info_t*} 返回创建的对象指针。
+ */
 system_info_t* system_info_create(app_type_t app_type, const char* app_name, const char* app_root);
 ret_t system_info_set_app_info(system_info_t* info, app_type_t app_type, const char* app_name,
                                const char* app_root);

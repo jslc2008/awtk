@@ -3,7 +3,7 @@
  * Author: AWTK Develop Team
  * Brief:  dialog_highlighter
  *
- * Copyright (c) 2018 - 2019  Guangzhou ZHIYUAN Electronics Co.,Ltd.
+ * Copyright (c) 2018 - 2020  Guangzhou ZHIYUAN Electronics Co.,Ltd.
  *
  * This program is distributed in the hope that it will be useful,
  * but WITHOUT ANY WARRANTY; without even the implied highlighterrranty of
@@ -31,6 +31,7 @@ typedef struct _dialog_highlighter_t dialog_highlighter_t;
 
 typedef ret_t (*dialog_highlighter_prepare_t)(dialog_highlighter_t* h, canvas_t* c);
 typedef ret_t (*dialog_highlighter_draw_t)(dialog_highlighter_t* h, float_t percent);
+typedef bool_t (*dialog_highlighter_is_dynamic_t)(dialog_highlighter_t* h);
 typedef ret_t (*dialog_highlighter_on_destroy_t)(dialog_highlighter_t* h);
 
 typedef dialog_highlighter_t* (*dialog_highlighter_create_t)(object_t* args);
@@ -41,6 +42,7 @@ typedef struct _dialog_highlighter_vtable_t {
   uint32_t size;
   dialog_highlighter_draw_t draw;
   dialog_highlighter_prepare_t prepare;
+  dialog_highlighter_is_dynamic_t is_dynamic;
   dialog_highlighter_on_destroy_t on_destroy;
 } dialog_highlighter_vtable_t;
 
@@ -65,6 +67,8 @@ typedef struct _dialog_highlighter_vtable_t {
  *
  */
 struct _dialog_highlighter_t {
+  emitter_t emitter;
+
   /**
    * @property {bitmap_t} img
    * 底层窗口的截图。
@@ -81,6 +85,12 @@ struct _dialog_highlighter_t {
    * 对应的对话框。
    */
   widget_t* dialog;
+
+  /**
+   * @property {rect_t*} clip_rect
+   * 截图的显示裁减区
+   */
+  rect_t clip_rect;
 
   /*private*/
   framebuffer_object_t fbo;
@@ -110,6 +120,16 @@ dialog_highlighter_t* dialog_highlighter_create(const dialog_highlighter_vtable_
 ret_t dialog_highlighter_set_bg(dialog_highlighter_t* h, bitmap_t* img, framebuffer_object_t* fbo);
 
 /**
+ * @method dialog_highlighter_set_bg_clip_rect
+ * 设置背景图片的显示裁减区。
+ * @param {dialog_highlighter_t*} h 对话框高亮策略对象。
+ * @param {rect_t*} clip_rect 背景显示裁减区。
+ *
+ * @return {ret_t} 返回RET_OK表示成功，否则表示失败。
+ */
+ret_t dialog_highlighter_set_bg_clip_rect(dialog_highlighter_t* h, rect_t* clip_rect);
+
+/**
  * @method dialog_highlighter_prepare
  * 初始化。在绘制完背景，在截图前调用。
  * @param {dialog_highlighter_t*} h 对话框高亮策略对象。
@@ -130,6 +150,15 @@ ret_t dialog_highlighter_prepare(dialog_highlighter_t* h, canvas_t* c);
 ret_t dialog_highlighter_draw(dialog_highlighter_t* h, float_t percent);
 
 /**
+ * @method dialog_highlighter_is_dynamic
+ * 是否是动态绘制(方便外层优化)。
+ * @param {dialog_highlighter_t*} h 对话框高亮策略对象。
+ *
+ * @return {bool_t} 返回TRUE表示动态绘制，否则表示不是动态绘制。
+ */
+bool_t dialog_highlighter_is_dynamic(dialog_highlighter_t* h);
+
+/**
  * @method dialog_highlighter_destroy
  * 销毁对话框高亮策略对象。
  * @param {dialog_highlighter_t*} h 对话框高亮策略对象。
@@ -137,6 +166,9 @@ ret_t dialog_highlighter_draw(dialog_highlighter_t* h, float_t percent);
  * @return {ret_t} 返回RET_OK表示成功，否则表示失败。
  */
 ret_t dialog_highlighter_destroy(dialog_highlighter_t* h);
+
+/*for window manager*/
+ret_t dialog_highlighter_clear_image(dialog_highlighter_t* h);
 
 END_C_DECLS
 

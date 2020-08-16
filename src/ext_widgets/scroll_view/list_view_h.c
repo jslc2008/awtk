@@ -3,7 +3,7 @@
  * Author: AWTK Develop Team
  * Brief:  list_view_h
  *
- * Copyright (c) 2018 - 2019  Guangzhou ZHIYUAN Electronics Co.,Ltd.
+ * Copyright (c) 2018 - 2020  Guangzhou ZHIYUAN Electronics Co.,Ltd.
  *
  * This program is distributed in the hope that it will be useful,
  * but WITHOUT ANY WARRANTY; without even the implied warranty of
@@ -39,7 +39,7 @@ static ret_t list_view_h_get_prop(widget_t* widget, const char* name, value_t* v
     value_set_int(v, list_view_h->item_width);
     return RET_OK;
   } else if (tk_str_eq(name, WIDGET_PROP_SPACING)) {
-    value_set_bool(v, list_view_h->spacing);
+    value_set_int(v, list_view_h->spacing);
     return RET_OK;
   }
 
@@ -54,7 +54,7 @@ static ret_t list_view_h_set_prop(widget_t* widget, const char* name, const valu
     list_view_h->item_width = value_int(v);
     return RET_OK;
   } else if (tk_str_eq(name, WIDGET_PROP_SPACING)) {
-    list_view_h->spacing = value_bool(v);
+    list_view_h->spacing = value_int(v);
     return RET_OK;
   }
 
@@ -62,21 +62,27 @@ static ret_t list_view_h_set_prop(widget_t* widget, const char* name, const valu
 }
 
 static ret_t list_view_h_on_event(widget_t* widget, event_t* e) {
-  uint16_t type = e->type;
+  ret_t ret = RET_OK;
   list_view_h_t* list_view = LIST_VIEW_H(widget);
+  return_value_if_fail(list_view != NULL, RET_BAD_PARAMS);
 
-  switch (type) {
-    case EVT_POINTER_DOWN:
-      widget_layout(list_view->scroll_view);
+  switch (e->type) {
+    case EVT_KEY_DOWN: {
+      key_event_t* evt = (key_event_t*)e;
+      if (evt->key == TK_KEY_PAGEDOWN) {
+        scroll_view_scroll_delta_to(list_view->scroll_view, widget->w, 0, TK_ANIMATING_TIME);
+        ret = RET_STOP;
+      } else if (evt->key == TK_KEY_PAGEUP) {
+        scroll_view_scroll_delta_to(list_view->scroll_view, -widget->w, 0, TK_ANIMATING_TIME);
+        ret = RET_STOP;
+      }
       break;
-    case EVT_POINTER_UP:
-      widget_layout(list_view->scroll_view);
-      break;
+    }
     default:
       break;
   }
 
-  return RET_OK;
+  return ret;
 }
 
 TK_DECL_VTABLE(list_view_h) = {.type = WIDGET_TYPE_LIST_VIEW_H,
@@ -90,10 +96,14 @@ TK_DECL_VTABLE(list_view_h) = {.type = WIDGET_TYPE_LIST_VIEW_H,
                                .on_paint_self = list_view_h_on_paint_self};
 
 static ret_t list_view_h_on_scroll_view_layout_children(widget_t* widget) {
+  int32_t spacing = 0;
+  int32_t item_width = 0;
   int32_t virtual_w = widget->w;
   list_view_h_t* list_view_h = LIST_VIEW_H(widget->parent);
-  int32_t spacing = list_view_h->spacing;
-  int32_t item_width = list_view_h->item_width;
+  return_value_if_fail(list_view_h != NULL, RET_BAD_PARAMS);
+
+  spacing = list_view_h->spacing;
+  item_width = list_view_h->item_width;
 
   if (widget->children != NULL) {
     int32_t i = 0;

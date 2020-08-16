@@ -1,17 +1,16 @@
 ## children\_layouter\_t
 ### 概述
- 子控件排版布局器的接口。
+子控件排版布局器的接口。
 
- 按特定算法对子控件进行排版布局，子类需要实现vtable中的函数。
-
-
-
+按特定算法对子控件进行排版布局，子类需要实现vtable中的函数。
 ----------------------------------
 ### 函数
 <p id="children_layouter_t_methods">
 
 | 函数名称 | 说明 | 
 | -------- | ------------ | 
+| <a href="#children_layouter_t_children_layouter_clone">children\_layouter\_clone</a> | 克隆layouter对象。 |
+| <a href="#children_layouter_t_children_layouter_create">children\_layouter\_create</a> | 创建layouter对象。 |
 | <a href="#children_layouter_t_children_layouter_destroy">children\_layouter\_destroy</a> | 销毁layouter对象。 |
 | <a href="#children_layouter_t_children_layouter_get_param">children\_layouter\_get\_param</a> | 获取指定的参数。 |
 | <a href="#children_layouter_t_children_layouter_get_param_float">children\_layouter\_get\_param\_float</a> | 获取指定的浮点格式的参数。 |
@@ -21,16 +20,50 @@
 | <a href="#children_layouter_t_children_layouter_set_param">children\_layouter\_set\_param</a> | 获取指定的参数。 |
 | <a href="#children_layouter_t_children_layouter_set_param_str">children\_layouter\_set\_param\_str</a> | 设置字符串格式的参数。 |
 | <a href="#children_layouter_t_children_layouter_to_string">children\_layouter\_to\_string</a> | 获取全部参数。 |
+#### children\_layouter\_clone 函数
+-----------------------
+
+* 函数功能：
+
+> <p id="children_layouter_t_children_layouter_clone">克隆layouter对象。
+
+* 函数原型：
+
+```
+children_layouter_t* children_layouter_clone (children_layouter_t* layouter);
+```
+
+* 参数说明：
+
+| 参数 | 类型 | 说明 |
+| -------- | ----- | --------- |
+| 返回值 | children\_layouter\_t* | 返回layouter对象。 |
+| layouter | children\_layouter\_t* | 被克隆的对象。 |
+#### children\_layouter\_create 函数
+-----------------------
+
+* 函数功能：
+
+> <p id="children_layouter_t_children_layouter_create">创建layouter对象。
+
+* 函数原型：
+
+```
+children_layouter_t* children_layouter_create (const char* params);
+```
+
+* 参数说明：
+
+| 参数 | 类型 | 说明 |
+| -------- | ----- | --------- |
+| 返回值 | children\_layouter\_t* | 返回layouter对象。 |
+| params | const char* | 参数。 |
 #### children\_layouter\_destroy 函数
 -----------------------
 
 * 函数功能：
 
-> <p id="children_layouter_t_children_layouter_destroy"> 销毁layouter对象。
-
-
-
-
+> <p id="children_layouter_t_children_layouter_destroy">销毁layouter对象。
 
 * 函数原型：
 
@@ -49,11 +82,7 @@ ret_t children_layouter_destroy (children_layouter_t* layouter);
 
 * 函数功能：
 
-> <p id="children_layouter_t_children_layouter_get_param"> 获取指定的参数。
-
-
-
-
+> <p id="children_layouter_t_children_layouter_get_param">获取指定的参数。
 
 * 函数原型：
 
@@ -74,11 +103,7 @@ ret_t children_layouter_get_param (children_layouter_t* layouter, const char* na
 
 * 函数功能：
 
-> <p id="children_layouter_t_children_layouter_get_param_float"> 获取指定的浮点格式的参数。
-
-
-
-
+> <p id="children_layouter_t_children_layouter_get_param_float">获取指定的浮点格式的参数。
 
 * 函数原型：
 
@@ -99,11 +124,7 @@ ret_t children_layouter_get_param_float (children_layouter_t* layouter, const ch
 
 * 函数功能：
 
-> <p id="children_layouter_t_children_layouter_get_param_int"> 获取指定的整数格式的参数。
-
-
-
-
+> <p id="children_layouter_t_children_layouter_get_param_int">获取指定的整数格式的参数。
 
 * 函数原型：
 
@@ -124,11 +145,7 @@ ret_t children_layouter_get_param_int (children_layouter_t* layouter, const char
 
 * 函数功能：
 
-> <p id="children_layouter_t_children_layouter_is_valid"> 判断layouter对象是否有效。
-
-
-
-
+> <p id="children_layouter_t_children_layouter_is_valid">判断layouter对象是否有效。
 
 * 函数原型：
 
@@ -147,11 +164,7 @@ bool_t children_layouter_is_valid (children_layouter_t* layouter);
 
 * 函数功能：
 
-> <p id="children_layouter_t_children_layouter_layout"> 对控件的子控件进行布局。
-
-
-
-
+> <p id="children_layouter_t_children_layouter_layout">对控件的子控件进行布局。
 
 * 函数原型：
 
@@ -171,11 +184,7 @@ ret_t children_layouter_layout (children_layouter_t* layouter, widget_t* widget)
 
 * 函数功能：
 
-> <p id="children_layouter_t_children_layouter_set_param"> 获取指定的参数。
-
-
-
-
+> <p id="children_layouter_t_children_layouter_set_param">获取指定的参数。
 
 * 函数原型：
 
@@ -196,11 +205,7 @@ ret_t children_layouter_set_param (children_layouter_t* layouter, const char* na
 
 * 函数功能：
 
-> <p id="children_layouter_t_children_layouter_set_param_str"> 设置字符串格式的参数。
-
-
-
-
+> <p id="children_layouter_t_children_layouter_set_param_str">设置字符串格式的参数。
 
 * 函数原型：
 
@@ -221,10 +226,7 @@ ret_t children_layouter_set_param_str (children_layouter_t* layouter, const char
 
 * 函数功能：
 
-> <p id="children_layouter_t_children_layouter_to_string"> 获取全部参数。
-
-
-
+> <p id="children_layouter_t_children_layouter_to_string">获取全部参数。
 
 * 函数原型：
 

@@ -3,7 +3,7 @@
  * Author: AWTK Develop Team
  * Brief:  width char
  *
- * Copyright (c) 2018 - 2019  Guangzhou ZHIYUAN Electronics Co.,Ltd.
+ * Copyright (c) 2018 - 2020  Guangzhou ZHIYUAN Electronics Co.,Ltd.
  *
  * This program is distributed in the hope that it will be useful,
  * but WITHOUT ANY WARRANTY; without even the implied warranty of
@@ -46,7 +46,7 @@ wchar_t* wcs_cpy(wchar_t* s1, const wchar_t* s2) {
   return s1;
 }
 
-int wcs_cmp(wchar_t* s1, const wchar_t* s2) {
+int wcs_cmp(const wchar_t* s1, const wchar_t* s2) {
   uint32_t i = 0;
   return_value_if_fail(s1 != NULL && s2 != NULL, -1);
 
@@ -83,7 +83,7 @@ size_t wcslen(const wchar_t* s) {
   return wcs_len(s);
 }
 
-int wcscmp(wchar_t* s1, const wchar_t* s2) {
+int wcscmp(const wchar_t* s1, const wchar_t* s2) {
   return wcs_cmp(s1, s2);
 }
 
@@ -92,11 +92,15 @@ wchar_t* wcscpy(wchar_t* s1, const wchar_t* s2) {
 }
 
 wchar_t* wcschr(const wchar_t* s, wchar_t c) {
-  return wcs_chr(s, c);
+  return (wchar_t*)wcs_chr(s, c);
 }
 
 wchar_t* wcsdup(const wchar_t* s) {
   return wcs_dup(s);
+}
+
+int iswspace(wchar_t ch) {
+  return ch == ' ';
 }
 
 #endif /*WITH_WCSXXX*/
@@ -153,7 +157,7 @@ ret_t wstr_set_utf8(wstr_t* str, const char* text) {
   return_value_if_fail(str != NULL && text != NULL, RET_BAD_PARAMS);
   return_value_if_fail(wstr_extend(str, strlen(text) + 2) == RET_OK, RET_OOM);
 
-  utf8_to_utf16(text, str->str, str->capacity - 1);
+  tk_utf8_to_utf16(text, str->str, str->capacity - 1);
   str->size = wcslen(str->str);
 
   return RET_OK;
@@ -161,7 +165,7 @@ ret_t wstr_set_utf8(wstr_t* str, const char* text) {
 
 ret_t wstr_get_utf8(wstr_t* str, char* text, uint32_t size) {
   return_value_if_fail(str != NULL && text != NULL, RET_BAD_PARAMS);
-  utf8_from_utf16(str->str, text, size);
+  tk_utf8_from_utf16(str->str, text, size);
 
   return RET_OK;
 }
@@ -244,7 +248,7 @@ ret_t wstr_push_int(wstr_t* str, const char* format, int32_t value) {
   return_value_if_fail(str != NULL && format != NULL, RET_BAD_PARAMS);
 
   tk_snprintf(buff, TK_NUM_MAX_LEN, format, value);
-  utf8_to_utf16(buff, s, TK_NUM_MAX_LEN);
+  tk_utf8_to_utf16(buff, s, TK_NUM_MAX_LEN);
 
   return wstr_append_with_len(str, s, wcslen(s));
 }
@@ -423,6 +427,31 @@ ret_t wstr_reset(wstr_t* str) {
   return_value_if_fail(str != NULL, RET_OK);
   TKMEM_FREE(str->str);
   memset(str, 0x00, sizeof(wstr_t));
+
+  return RET_OK;
+}
+
+ret_t wstr_normalize_newline(wstr_t* str, wchar_t newline) {
+  wchar_t* s = str->str;
+  wchar_t* d = str->str;
+
+  while (*s) {
+    if (*s == '\r') {
+      if (s[1] == '\n') {
+        s++;
+      }
+      s++;
+      *d++ = newline;
+    } else if (*s == '\n') {
+      s++;
+      *d++ = newline;
+    } else {
+      *d++ = *s++;
+    }
+  }
+
+  *d = '\0';
+  str->size = d - str->str;
 
   return RET_OK;
 }

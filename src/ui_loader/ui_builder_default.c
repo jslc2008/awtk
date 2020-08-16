@@ -1,9 +1,9 @@
-/**
+﻿/**
  * File:   ui_builder_default.c
  * Author: AWTK Develop Team
  * Brief:  ui_builder default
  *
- * Copyright (c) 2018 - 2019  Guangzhou ZHIYUAN Electronics Co.,Ltd.
+ * Copyright (c) 2018 - 2020  Guangzhou ZHIYUAN Electronics Co.,Ltd.
  *
  * This program is distributed in the hope that it will be useful,
  * but WITHOUT ANY WARRANTY; without even the implied warranty of
@@ -19,10 +19,9 @@
  *
  */
 
-#include "widgets/view.h"
 #include "tkc/utf8.h"
 #include "base/enums.h"
-#include "widgets/dialog.h"
+#include "base/dialog.h"
 #include "base/widget_factory.h"
 #include "ui_loader/ui_builder_default.h"
 #include "ui_loader/ui_loader_default.h"
@@ -45,11 +44,10 @@ static ret_t ui_builder_default_on_widget_start(ui_builder_t* b, const widget_de
   }
 
   b->widget = widget;
+  b->widget->loading = TRUE;
   if (b->root == NULL) {
     b->root = widget;
   }
-
-  // log_debug("%s %d %d %d %d\n", type, (int)(x), (int)(y), (int)(w), (int)(h));
 
   return RET_OK;
 }
@@ -64,27 +62,36 @@ static ret_t ui_builder_default_on_widget_prop(ui_builder_t* b, const char* name
 }
 
 static ret_t ui_builder_default_on_widget_prop_end(ui_builder_t* b) {
-  (void)b;
   return RET_OK;
 }
 
 static ret_t ui_builder_default_on_widget_end(ui_builder_t* b) {
-  b->widget = b->widget->parent;
+  if (b->widget != NULL) {
+    event_t e = event_init(EVT_WIDGET_LOAD, NULL);
+    widget_dispatch(b->widget, &e);
+
+    b->widget->loading = FALSE;
+    b->widget = b->widget->parent;
+  }
+
   return RET_OK;
 }
 
 static ret_t ui_builder_default_on_end(ui_builder_t* b) {
   if (b->root != NULL) {
-    widget_t* win = b->root;
-    event_t e = event_init(EVT_WINDOW_LOAD, win);
+    widget_t* widget = b->root;
 
-    if (win && win->name == NULL) {
-      widget_set_name(win, b->name);
+    widget_invalidate_force(widget, NULL);
+    if (widget && (widget->name == NULL || widget->name[0] == 0)) {
+      widget_set_name(widget, b->name);
     }
 
-    widget_layout(win);
-    widget_dispatch(win, &e);
-    widget_invalidate_force(win, NULL);
+    if (widget->vt->is_window) {
+      event_t e = event_init(EVT_WINDOW_LOAD, widget);
+
+      widget_layout(widget);
+      widget_dispatch(widget, &e);
+    }
   }
 
   return RET_OK;

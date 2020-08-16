@@ -3,7 +3,7 @@
  * Author: AWTK Develop Team
  * Brief:  vector graphics canvas interface.
  *
- * Copyright (c) 2018 - 2019  Guangzhou ZHIYUAN Electronics Co.,Ltd.
+ * Copyright (c) 2018 - 2020  Guangzhou ZHIYUAN Electronics Co.,Ltd.
  *
  * This program is distributed in the hope that it will be useful,
  * but WITHOUT ANY WARRANTY; without even the implied warranty of
@@ -19,11 +19,19 @@
  *
  */
 
-#include "tkc/mem.h"
-#include "tkc/utils.h"
-#include "tkc/color_parser.h"
 #include "base/vgcanvas.h"
 #include "base/system_info.h"
+#include "tkc/color_parser.h"
+#include "tkc/mem.h"
+#include "tkc/utils.h"
+
+ret_t vgcanvas_set_assets_manager(vgcanvas_t* vg, assets_manager_t* assets_manager) {
+  return_value_if_fail(vg != NULL, RET_BAD_PARAMS);
+
+  vg->assets_manager = assets_manager;
+
+  return RET_OK;
+}
 
 ret_t vgcanvas_reset(vgcanvas_t* vg) {
   return_value_if_fail(vg != NULL && vg->vt->reset != NULL, RET_BAD_PARAMS);
@@ -86,6 +94,22 @@ ret_t vgcanvas_clip_rect(vgcanvas_t* vg, float_t x, float_t y, float_t w, float_
   return vg->vt->clip_rect(vg, x, y, w, h);
 }
 
+ret_t vgcanvas_intersect_clip_rect(vgcanvas_t* vg, float_t x, float_t y, float_t w, float_t h) {
+  ret_t ret = RET_OK;
+  return_value_if_fail(vg != NULL && vg->vt->intersect_clip_rect != NULL, RET_BAD_PARAMS);
+
+  fix_xywh(x, y, w, h);
+
+  ret = vg->vt->intersect_clip_rect(vg, &x, &y, &w, &h);
+
+  vg->clip_rect.x = x;
+  vg->clip_rect.y = y;
+  vg->clip_rect.w = w;
+  vg->clip_rect.h = h;
+
+  return ret;
+}
+
 ret_t vgcanvas_fill(vgcanvas_t* vg) {
   return_value_if_fail(vg != NULL && vg->vt->fill != NULL, RET_BAD_PARAMS);
 
@@ -107,6 +131,7 @@ ret_t vgcanvas_paint(vgcanvas_t* vg, bool_t stroke, bitmap_t* img) {
 ret_t vgcanvas_destroy(vgcanvas_t* vg) {
   return_value_if_fail(vg != NULL && vg->vt->destroy != NULL, RET_BAD_PARAMS);
 
+  TKMEM_FREE(vg->font);
   TKMEM_FREE(vg->text_baseline);
   TKMEM_FREE(vg->text_align);
 
@@ -145,6 +170,12 @@ ret_t vgcanvas_close_path(vgcanvas_t* vg) {
   return_value_if_fail(vg != NULL && vg->vt->close_path != NULL, RET_BAD_PARAMS);
 
   return vg->vt->close_path(vg);
+}
+
+ret_t vgcanvas_path_winding(vgcanvas_t* vg, bool_t dir) {
+  return_value_if_fail(vg != NULL && vg->vt->path_winding != NULL, RET_BAD_PARAMS);
+
+  return vg->vt->path_winding(vg, dir);
 }
 
 ret_t vgcanvas_transform(vgcanvas_t* vg, float_t a, float_t b, float_t c, float_t d, float_t e,
@@ -196,13 +227,10 @@ bool_t vgcanvas_is_point_in_path(vgcanvas_t* vg, float_t x, float_t y) {
 ret_t vgcanvas_set_font(vgcanvas_t* vg, const char* font) {
   return_value_if_fail(vg != NULL && vg->vt->set_font != NULL, RET_BAD_PARAMS);
 
-  if (font == NULL) {
-    font = TK_DEFAULT_FONT;
-  }
+  font = system_info_fix_font_name(font);
+  vg->font = tk_str_copy(vg->font, font);
 
-  vg->font = font;
-
-  return vg->vt->set_font(vg, font);
+  return vg->vt->set_font(vg, vg->font);
 }
 
 ret_t vgcanvas_set_font_size(vgcanvas_t* vg, float_t size) {
@@ -380,10 +408,10 @@ ret_t vgcanvas_end_frame(vgcanvas_t* vg) {
   return vg->vt->end_frame(vg);
 }
 
-ret_t vgcanvas_create_fbo(vgcanvas_t* vg, framebuffer_object_t* fbo) {
+ret_t vgcanvas_create_fbo(vgcanvas_t* vg, uint32_t w, uint32_t h, framebuffer_object_t* fbo) {
   return_value_if_fail(vg != NULL && vg->vt->create_fbo != NULL && fbo != NULL, RET_BAD_PARAMS);
 
-  return vg->vt->create_fbo(vg, fbo);
+  return vg->vt->create_fbo(vg, w, h, fbo);
 }
 
 ret_t vgcanvas_destroy_fbo(vgcanvas_t* vg, framebuffer_object_t* fbo) {
@@ -424,6 +452,10 @@ ret_t vgcanvas_reinit(vgcanvas_t* vg, uint32_t w, uint32_t h, uint32_t stride,
                       bitmap_format_t format, void* data) {
   return_value_if_fail(vg != NULL && data != NULL, RET_BAD_PARAMS);
 
+  if (vg->w == w && vg->h == h && vg->buff == (uint32_t*)data) {
+    return RET_OK;
+  }
+
   if (vg->vt->reinit != NULL) {
     return vg->vt->reinit(vg, w, h, stride, format, data);
   }
@@ -439,7 +471,7 @@ ret_t fbo_to_img(framebuffer_object_t* fbo, bitmap_t* img) {
   return_value_if_fail(fbo != NULL && img != NULL, RET_BAD_PARAMS);
 
   memset(img, 0x00, sizeof(bitmap_t));
-  img->specific = (char*)NULL + fbo->id;
+  img->specific = tk_pointer_from_int(fbo->id);
   img->specific_ctx = NULL;
   img->specific_destroy = NULL;
   img->w = fbo->w * fbo->ratio;
@@ -448,4 +480,48 @@ ret_t fbo_to_img(framebuffer_object_t* fbo, bitmap_t* img) {
   img->flags = BITMAP_FLAG_TEXTURE;
 
   return RET_OK;
+}
+
+ret_t vgcanvas_fbo_to_bitmap(vgcanvas_t* vg, framebuffer_object_t* fbo, bitmap_t* img, rect_t* r) {
+  return_value_if_fail(vg != NULL && fbo != NULL && img != NULL, RET_BAD_PARAMS);
+  if (vg->vt != NULL && vg->vt->fbo_to_bitmap != NULL) {
+    return vg->vt->fbo_to_bitmap(vg, fbo, img, r);
+  }
+
+  return RET_NOT_IMPL;
+}
+
+wh_t vgcanvas_get_width(vgcanvas_t* vgcanvas) {
+  return_value_if_fail(vgcanvas != NULL && vgcanvas->vt != NULL, 0);
+
+  if (vgcanvas->vt->get_width != NULL) {
+    return vgcanvas->vt->get_width(vgcanvas);
+  } else {
+    return vgcanvas->w;
+  }
+}
+
+wh_t vgcanvas_get_height(vgcanvas_t* vgcanvas) {
+  return_value_if_fail(vgcanvas != NULL && vgcanvas->vt != NULL, 0);
+
+  if (vgcanvas->vt->get_height != NULL) {
+    return vgcanvas->vt->get_height(vgcanvas);
+  } else {
+    return vgcanvas->h;
+  }
+}
+
+ret_t vgcanvas_get_text_metrics(vgcanvas_t* vg, float_t* ascent, float_t* descent,
+                                float_t* line_hight) {
+  return_value_if_fail(vg != NULL && vg->vt != NULL, RET_BAD_PARAMS);
+  return_value_if_fail(vg->vt->get_text_metrics != NULL, RET_BAD_PARAMS);
+
+  return vg->vt->get_text_metrics(vg, ascent, descent, line_hight);
+}
+
+ret_t vgcanvas_clear_cache(vgcanvas_t* vg) {
+  return_value_if_fail(vg != NULL && vg->vt != NULL, RET_BAD_PARAMS);
+  return_value_if_fail(vg->vt->clear_cache != NULL, RET_BAD_PARAMS);
+
+   return vg->vt->clear_cache(vg);
 }

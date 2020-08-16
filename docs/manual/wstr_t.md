@@ -1,22 +1,19 @@
 ## wstr\_t
 ### 概述
- 可变长度的宽字符字符串。
+可变长度的宽字符字符串。
 
- 示例：
+示例：
 
- ```c
-  wstr_t s;
-  wstr_init(&s, 0);
+```c
+wstr_t s;
+wstr_init(&s, 0);
 
-  wstr_append(&s, L"abc");
-  wstr_append(&s, L"123");
+wstr_append(&s, L"abc");
+wstr_append(&s, L"123");
 
-  wstr_reset(&s);
- ```
- > 先调wstr\_init进行初始化，最后调用wstr\_reset释放内存。
-
-
-
+wstr_reset(&s);
+```
+> 先调wstr\_init进行初始化，最后调用wstr\_reset释放内存。
 ----------------------------------
 ### 函数
 <p id="wstr_t_methods">
@@ -34,6 +31,7 @@
 | <a href="#wstr_t_wstr_get_utf8">wstr\_get\_utf8</a> | 获取UTF8字符串。 |
 | <a href="#wstr_t_wstr_init">wstr\_init</a> | 初始化字符串对象。 |
 | <a href="#wstr_t_wstr_insert">wstr\_insert</a> | 在指定位置插入字符串。 |
+| <a href="#wstr_t_wstr_normalize_newline">wstr\_normalize\_newline</a> | 规范化换行符。 |
 | <a href="#wstr_t_wstr_pop">wstr\_pop</a> | 删除尾部字符。 |
 | <a href="#wstr_t_wstr_push">wstr\_push</a> | 追加一个字符。 |
 | <a href="#wstr_t_wstr_push_int">wstr\_push\_int</a> | 追加一个整数。 |
@@ -57,10 +55,7 @@
 
 * 函数功能：
 
-> <p id="wstr_t_wstr_add_float"> 将字符串转成浮点数，加上delta，再转换回来。
-
-
-
+> <p id="wstr_t_wstr_add_float">将字符串转成浮点数，加上delta，再转换回来。
 
 * 函数原型：
 
@@ -80,10 +75,7 @@ ret_t wstr_add_float (wstr_t* str, double delta);
 
 * 函数功能：
 
-> <p id="wstr_t_wstr_append"> 追加字符串。
-
-
-
+> <p id="wstr_t_wstr_append">追加字符串。
 
 * 函数原型：
 
@@ -103,10 +95,7 @@ ret_t wstr_append (wstr_t* str, wchar_t* text);
 
 * 函数功能：
 
-> <p id="wstr_t_wstr_append_with_len"> 追加字符串。
-
-
-
+> <p id="wstr_t_wstr_append_with_len">追加字符串。
 
 * 函数原型：
 
@@ -127,10 +116,7 @@ ret_t wstr_append_with_len (wstr_t* str, wchar_t* text, uint32_t len);
 
 * 函数功能：
 
-> <p id="wstr_t_wstr_clear"> 清除字符串内容。
-
-
-
+> <p id="wstr_t_wstr_clear">清除字符串内容。
 
 * 函数原型：
 
@@ -149,10 +135,7 @@ ret_t wstr_clear (wstr_t* str);
 
 * 函数功能：
 
-> <p id="wstr_t_wstr_equal"> 判断两个字符是否相同。
-
-
-
+> <p id="wstr_t_wstr_equal">判断两个字符是否相同。
 
 * 函数原型：
 
@@ -172,10 +155,7 @@ bool_t wstr_equal (wstr_t* str, wstr_t* other);
 
 * 函数功能：
 
-> <p id="wstr_t_wstr_from_float"> 用浮点数初始化字符串。
-
-
-
+> <p id="wstr_t_wstr_from_float">用浮点数初始化字符串。
 
 * 函数原型：
 
@@ -195,10 +175,7 @@ ret_t wstr_from_float (wstr_t* str, double v);
 
 * 函数功能：
 
-> <p id="wstr_t_wstr_from_int"> 用整数初始化字符串。
-
-
-
+> <p id="wstr_t_wstr_from_int">用整数初始化字符串。
 
 * 函数原型：
 
@@ -218,10 +195,7 @@ ret_t wstr_from_int (wstr_t* str, int32_t v);
 
 * 函数功能：
 
-> <p id="wstr_t_wstr_from_value"> 用value初始化字符串。
-
-
-
+> <p id="wstr_t_wstr_from_value">用value初始化字符串。
 
 * 函数原型：
 
@@ -241,10 +215,7 @@ ret_t wstr_from_value (wstr_t* str, value_t v);
 
 * 函数功能：
 
-> <p id="wstr_t_wstr_get_utf8"> 获取UTF8字符串。
-
-
-
+> <p id="wstr_t_wstr_get_utf8">获取UTF8字符串。
 
 * 函数原型：
 
@@ -265,10 +236,7 @@ ret_t wstr_get_utf8 (wstr_t* str, char* text, uint32_t size);
 
 * 函数功能：
 
-> <p id="wstr_t_wstr_init"> 初始化字符串对象。
-
-
-
+> <p id="wstr_t_wstr_init">初始化字符串对象。
 
 * 函数原型：
 
@@ -288,10 +256,7 @@ wstr_t* wstr_init (wstr_t* str, uint32_t capacity);
 
 * 函数功能：
 
-> <p id="wstr_t_wstr_insert"> 在指定位置插入字符串。
-
-
-
+> <p id="wstr_t_wstr_insert">在指定位置插入字符串。
 
 * 函数原型：
 
@@ -308,15 +273,32 @@ ret_t wstr_insert (wstr_t* str, uint32_t offset, wchar_t* text, uint32_t nr);
 | offset | uint32\_t | 指定的位置。 |
 | text | wchar\_t* | 待插入的文本。 |
 | nr | uint32\_t | 要插入的字符数。 |
+#### wstr\_normalize\_newline 函数
+-----------------------
+
+* 函数功能：
+
+> <p id="wstr_t_wstr_normalize_newline">规范化换行符。
+
+* 函数原型：
+
+```
+ret_t wstr_normalize_newline (wstr_t* str, wchar_t newline);
+```
+
+* 参数说明：
+
+| 参数 | 类型 | 说明 |
+| -------- | ----- | --------- |
+| 返回值 | ret\_t | 返回RET\_OK表示成功，否则表示失败。 |
+| str | wstr\_t* | str对象。 |
+| newline | wchar\_t | 换行符。 |
 #### wstr\_pop 函数
 -----------------------
 
 * 函数功能：
 
-> <p id="wstr_t_wstr_pop"> 删除尾部字符。
-
-
-
+> <p id="wstr_t_wstr_pop">删除尾部字符。
 
 * 函数原型：
 
@@ -335,10 +317,7 @@ ret_t wstr_pop (wstr_t* str);
 
 * 函数功能：
 
-> <p id="wstr_t_wstr_push"> 追加一个字符。
-
-
-
+> <p id="wstr_t_wstr_push">追加一个字符。
 
 * 函数原型：
 
@@ -358,10 +337,7 @@ ret_t wstr_push (wstr_t* str, wchar_t c);
 
 * 函数功能：
 
-> <p id="wstr_t_wstr_push_int"> 追加一个整数。
-
-
-
+> <p id="wstr_t_wstr_push_int">追加一个整数。
 
 * 函数原型：
 
@@ -382,10 +358,7 @@ ret_t wstr_push_int (wstr_t* str, const char* format, int32_t value);
 
 * 函数功能：
 
-> <p id="wstr_t_wstr_remove"> 删除指定范围的字符。
-
-
-
+> <p id="wstr_t_wstr_remove">删除指定范围的字符。
 
 * 函数原型：
 
@@ -406,10 +379,7 @@ ret_t wstr_remove (wstr_t* str, uint32_t offset, uint32_t nr);
 
 * 函数功能：
 
-> <p id="wstr_t_wstr_reset"> 重置字符串为空。
-
-
-
+> <p id="wstr_t_wstr_reset">重置字符串为空。
 
 * 函数原型：
 
@@ -428,10 +398,7 @@ ret_t wstr_reset (wstr_t* str);
 
 * 函数功能：
 
-> <p id="wstr_t_wstr_set"> 设置字符串。
-
-
-
+> <p id="wstr_t_wstr_set">设置字符串。
 
 * 函数原型：
 
@@ -451,10 +418,7 @@ ret_t wstr_set (wstr_t* str, wchar_t* text);
 
 * 函数功能：
 
-> <p id="wstr_t_wstr_set_utf8"> 设置UTF8字符串。
-
-
-
+> <p id="wstr_t_wstr_set_utf8">设置UTF8字符串。
 
 * 函数原型：
 
@@ -474,10 +438,7 @@ ret_t wstr_set_utf8 (wstr_t* str, char* text);
 
 * 函数功能：
 
-> <p id="wstr_t_wstr_to_float"> 将字符串转成浮点数。
-
-
-
+> <p id="wstr_t_wstr_to_float">将字符串转成浮点数。
 
 * 函数原型：
 
@@ -497,10 +458,7 @@ ret_t wstr_to_float (wstr_t* str, double* v);
 
 * 函数功能：
 
-> <p id="wstr_t_wstr_to_int"> 将字符串转成整数。
-
-
-
+> <p id="wstr_t_wstr_to_int">将字符串转成整数。
 
 * 函数原型：
 
@@ -520,10 +478,7 @@ ret_t wstr_to_int (wstr_t* str, int32_t* v);
 
 * 函数功能：
 
-> <p id="wstr_t_wstr_trim_float_zero"> 去掉浮点数小数点尾部的零。
-
-
-
+> <p id="wstr_t_wstr_trim_float_zero">去掉浮点数小数点尾部的零。
 
 * 函数原型：
 
@@ -539,9 +494,7 @@ ret_t wstr_trim_float_zero (wstr_t* str);
 | str | wstr\_t* | str对象。 |
 #### capacity 属性
 -----------------------
-> <p id="wstr_t_capacity"> 容量。
-
-
+> <p id="wstr_t_capacity">容量。
 
 * 类型：uint32\_t
 
@@ -551,9 +504,7 @@ ret_t wstr_trim_float_zero (wstr_t* str);
 | 可直接修改 | 否 |
 #### size 属性
 -----------------------
-> <p id="wstr_t_size"> 长度。
-
-
+> <p id="wstr_t_size">长度。
 
 * 类型：uint32\_t
 
@@ -563,9 +514,7 @@ ret_t wstr_trim_float_zero (wstr_t* str);
 | 可直接修改 | 否 |
 #### str 属性
 -----------------------
-> <p id="wstr_t_str"> 字符串。
-
-
+> <p id="wstr_t_str">字符串。
 
 * 类型：wchar\_t*
 

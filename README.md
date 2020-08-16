@@ -1,145 +1,331 @@
-
-
-![zlg](docs/images/zlg_adv.jpeg)
-
 # AWTK = Toolkit AnyWhere
 
-最终目标：
+> [中文用户请看这里](README_zh.md)
 
-* 支持开发嵌入式软件。
-* 支持开发Linux应用程序。
-* 支持开发MacOS应用程序。
-* 支持开发Windows应用程序。
-* 支持开发Android应用程序。
-* 支持开发iOS应用程序。
-* 支持开发2D游戏。
+## I. Introduction
 
-其主要特色有：
+[AWTK](README.md) , the abbreviation of Toolkit AnyWhere, is an open source GUI engine developed by [ZLG](http://www.zlg.cn/). It is a cross-platform GUI engine for embedded systems, WEB, mini programs, mobile phones and PC. It is a powerful, efficient, reliable and easy-to-use GUI engine for users to design beautiful GUI applications.
 
-1. 小巧。在精简配置下，不依赖第三方软件包，仅需要32K RAM + 256K FLASH即可开发一些简单的图形应用程序。
+> Welcome developers to join us in our development:[Joint Ecology Building Plan](docs/awtk_ecology.md)
 
-2. 高效。采用脏矩形裁剪算法，每次只绘制和更新变化的部分，极大提高运行效率和能源利用率。
+#### [AWTK](README.md) has two implications as follows: 
 
-3. 稳定。通过良好的架构设计和编程风格、单元测试、动态(valgrind)检查和Code Review保证其运行的稳定性。
+* Toolkit AnyWhere.
+* As the built-in GUI of AWorksOS, which is the ZLG IoT operating system.
 
-4. 丰富的GUI组件。提供窗口、对话框和各种常用的组件(用户可以配置自己需要的组件，降低对运行环境的要求)。
+#### [AWTK](README.md) source code repositories:
 
-5. 支持多种字体格式。内置位图字体(并提供转换工具)，也可以使用stb\_truetype或freetype加载ttf字体。
+* Main source code repository: [https://github.com/zlgopen/awtk](https://github.com/zlgopen/awtk)
+* Mirrored source code repository：[https://gitee.com/zlgopen/awtk](https://gitee.com/zlgopen/awtk)
+* Stable version pack: https://pan.baidu.com/s/1_oRgj67M-I4kivk-YzwFWA    Access code:1cmi
 
-6. 支持多种图片格式。内置位图图片(并提供转换工具)，也可以使用stb\_image加载png/jpg等格式的图片。
+#### AWTK Designer - the UI design tool:
 
-7. 紧凑的二进制界面描述格式。可以手工编辑的XML格式的界面描述文件，也可以使用Qt Designer设计界面，然后转换成紧凑的二进制界面描述格式，提高运行效率，减小内存开销。
+* It is no longer necessary to write XML by yourself.
+* Design the UI by drag and drop. What you see is what you get.
+* Support quick preview and pack resources with one-click.
+* Registration and download: https://awtk.zlg.cn
 
-8. 支持主题并采用紧凑的二进制格式。开发时使用XML格式描述主题，然后转换成紧凑的二进制格式，提高运行效率，减小内存开销。
+![AWTK Designer](docs/images/designer.png)
 
-9. 支持裸系统，无需OS和文件系统。字体、图片、主题和界面描述数据都编译到代码中，以常量数据的形式存放，运行时无需加载到内存。
+#### Screenshots:
 
-10. 内置nanovg实现高质量的矢量动画，并支持SVG矢量图。
+![Chart-Demo](docs/images/chart_main.png)
 
-11. 支持窗口动画、控件动画、滑动动画和高清LCD等现代GUI常见特性。
+![MusicPlayer-Demo](docs/images/musicplayer_main.png)
 
-12. 支持国际化(Unicode、字符串翻译和输入法等)。
+![Watch](docs/images/smartwatch_main.png)
 
-13. 可移植。支持移植到各种RTOS和嵌入式Linux系统，并通过SDL在各种流行的PC/手机系统上运行。
+## II. Ultimate Objectives
 
-14. 脚本化。从API注释中提取API的描述信息，通过这些信息可以自动生成各种脚本的绑定代码。
+* To support development of embedded applications.✔
+* To support development of Linux applications.✔
+* To support development of MacOS applications.✔
+* To support development of Windows applications.✔
+* To support development of Web applications.✔
+* To support development of Android applications.✔
+* To support development of iOS applications.✔
+* To support development of WeChat mini programs.
+* To support development of AliPay mini programs.
+* To support development of Baidu mini programs.
+* To support development of 2D mini games.
 
-15. 支持硬件2D加速(目前支持STM32的DMA2D和NXP的PXP)和GPU加速(OpenGL/OpenGLES/DirectX/Metal)，充分挖掘硬件潜能。
+## III. Main Features
 
-16. 丰富的文档和示例代码。
+### 1. Cross-platform
 
-17. 采用LGPL协议开源发布，在商业软件中使用时无需付费。
+[AWTK](README.md) is a cross-platform GUI engine , which has two meanings as follows:
 
-目前核心功能已经完成，内部开始在实际项目中使用了，欢迎有兴趣的朋友评估和尝试，期待您的反馈。
+* AWTK's code is cross-platform. At present, it is compatible with platforms such as ZLG AWorksOS, Windows, Linux, MacOS, embedded Linux, Android, iOS, Web and embedded raw systems. It can be easily ported to variety of different RTOS. In the future, AWTK can be also run as mini programs. 
 
-## 模拟运行：
+* In addition, AWTK has a cross-platform library of basic tools, which includes lists, arrays, strings (UTF8 and widechar), event emitters, values, objects, file system, mutex, threads, formulas and string analysis, in order that the applications you develop with AWTK can really run across platforms.
+
+### 2. Efficient
+
+[AWTK](README.md)  ensure efficiency through the following operations: 
+
+* Update changed parts using dirty rectangles algorithms.
+* Support 3 FrameBuffer to make the UI run at the highest frame rate (optional).
+* UI description files and theme files are stored in efficient binary formats, in order that they can be analyzed more fast.
+* Support different GPU acceleration interfaces, including OpenGL, DirectX, Vulkan and Metal and so on.
+* Support 2D acceleration interfaces of embedded platforms, such as NXP's PXP interfaces and STM32's DMA2D interfaces, user can easy to adapt to other acceleration interfaces.
+
+### 3. Stable
+
+[AWTK](README.md) makes codes as stable and reliable as possible in following ways: 
+
+* Perform static checks using cppcheck and facebook infer.
+* Dynamically check memory with valgrind.
+* With approximately 20,000 lines of codes for unit testing.
+* With support from the powerful GUI team of ZLG.
+* Has been validated in multiple practical projects.
+* Has been validated by multiple platforms and compilers.
+* With excellent architecture design.
+* Code Review.
+* Manual test.
+
+### 4. Powerful 
+
+* Abundant widgets (being add more widgets).
+* Support multiple image formats (png/jpg/gif/svg).
+* Support multiple font formats (bitmap and vector fonts).
+* Support window animation function.
+* Support widget animation function.
+* Support HD screen.
+* Support UI layout description file.
+* Support UI theme file.
+* Support switch themes in runtime.
+* Support custom rule for widget layout.
+* Support custom rule for highlighting dialogs.
+* With many auxiliary tools.
+* Support different CPU from low-end (such as Cortex M3) to high-end.
+* Support no-filesystem platform and custom filesystem.
+* Support raw systems platform and RTOS.
+
+### 5. Easy-to-use
+
+* With many demonstration codes.
+* With complete API document and user guide document.
+* With technical support from the powerful team of ZLG.
+* With the UI designer, which also developed with AWTK (https://awtk.zlg.cn). 
+* Use declarative UI description language. user can enable widget animation, window animation, and image display (png/jpg/svg/gif) with one line code.
+
+### 6. Customizable 
+
+* Support extend custom widgets.
+* Support extend custom animations.
+* Support implement custom main loop.
+* Support extend custom soft keyboard.
+* Support extend custom image loader.
+* Support extend custom font loader.
+* Support extend custom input method engine.
+* Support extend custom layout algorithms for widgets.
+* Support extend custom rule for highlighting dialogs.
+* Support implement custom LCD interface.
+* Support extend custom vector engines (e.g.skia/cairo).
+* All extended and built-in widgets are treated the same.
+
+### 7. Multiple Development Languages
+
+[AWTK](README.md) is been developed in the C Program Language. Scripts in different languages can be generated by the IDL. The binding code generated not only simply mapping the C API to the target script language, but  also with the native code styles of the target script language. At present, following languages are supported (More languages will be added): 
+
+* C
+* C++
+* lua
+* java
+* python
+* Javascript on jerryscript
+* Javascript on nodejs
+* Javascript on quickjs
+
+### 8. Internationalization 
+
+* Support Unicode. 
+* Support input methods.
+* Support translate strings. 
+* Support translate images.
+* Support text bidirectional algorithms.
+
+### 9. The MVVM framework for embedded software thoroughly separate user interfaces from business logic 
+
+* High performances. 
+* Low memory usage.
+* More thorough isolation.
+* Portable to other GUI.
+* Less codes (~5,000 lines).
+* No need for learning API of AWTK.
+* Support multiple programming languages (support C/JS at present).
+
+> For details, please see https://github.com/zlgopen/awtk-mvvm
+
+### 10. Open source codes are freely available for commercial purposes (LGPL)
+
+## IV.  Simulation Run
+
+### Code Downloading 
+
+* Download with git 
+
+> [Git under Windows](https://git-scm.com/download/win)
+
+**Code Downloading**
+
+```
+git clone https://github.com/zlgopen/awtk.git
+```
+
+> Under Windows, codes can be downloaded by git with GUI tool.
+
+**Code Updating (in the awtk directory)**
+
+```
+git pull
+```
+
+>  The advantage of using Git is that it is very convenient to update the code later.
+
+* Directly download the zip file.
+
+>  Download the [ zip file](https://github.com/zlgopen/awtk/archive/master.zip). Once unzipped, the file shall be renamed **awtk**.
 
 ### Mac
 
-如果没有安装scons和sdl2，请在终端运行下面的命令(假定已安装brew)：
-
+If scons and sdl2 aren't installed, please run the following command in the terminal (assuming that brew has been installed):
 ```
 brew install scons sdl2
 ```
 
-编译运行(在终端下，进入awtk所在的目录，并运行下列命令)：
+Compile and run (Enter the directory where awtk is and run the following command in the terminal): 
 
 ```
 scons
 ./bin/demoui
 ```
 
-### Ubuntu (版本>=16)
+### Ubuntu （version >=16)
 
-如果没有安装scons和依赖的软件包，请在终端运行下面的命令：
+ If scons and the dependent software pack aren't installed, please run the following command in the terminal:
 
 ```
-sudo apt-get install scons libsndio-dev libgtk-3-dev libglu1-mesa libglu1-mesa-dev libgl1-mesa-glx libgl1-mesa-dev
+sudo apt-get install scons libsndio-dev libgtk-3-dev libglu1-mesa libglu1-mesa-dev libgl1-mesa-glx libgl1-mesa-dev libasound2-dev git vim clang-format
 ```
 
-编译运行(在终端下，进入awtk所在的目录，并运行下列命令)：
+Compile and run (Enter the awtk directory and run the following command in the terminal): 
 
 ```
 scons
 ./bin/demoui
 ```
+
+> If it can't be run in Ubuntu 14, please refer to [FAQ](docs/faq.md).
 
 ### Windows
 
-(请先安装python2.7，scons和Visual Studio C++(版本>=2017)
+> Please install python (64-bit python shall be installed for a 64-bit system), scons and Visual Studio C++ (version>=2017) first.
 
-编译运行(在命令行模式下，进入awtk所在的目录，并运行下列命令)：
+>  If pywin32 isn't installed, please use pip install:
+
+```
+pip install pywin32
+```
+
+Compile and run (Enter the awtk directory and run the following command in the terminal): 
 
 ```
 scons
 bin\demoui
 ```
 
-## 演示视频
+> If PIL isn't installed, please use pip install:
 
-1.[基本控件演示](https://v.qq.com/txp/iframe/player.html?vid=n07811pocfx)
+```
+pip install Pillow
+```
 
-## 各个平台的移植
+## V. Online Demonstration
 
-#### 官方支持平台 
+* [Online Demonstration of Basic Widgets](http://zlgawtk.bceapp.com/awtk/demos/demoui/index.html)
 
-* [awtk-aworks-rt1052](https://github.com/zlgopen/awtk-aworks-rt1052)
+* [Graphical Demonstration](http://zlgawtk.bceapp.com/awtk/demos/Chart-Demo/index.html)
 
-#### 移植示例(不定期更新)
+* [Music Player Demonstration](http://zlgawtk.bceapp.com/awtk/demos/MusicPlayer-Demo/index.html)
 
-* [awtk-sylixos](https://github.com/zlgopen/awtk-sylixos)
+* [Smart Watch Demonstration](http://zlgawtk.bceapp.com/awtk/demos/SmartWatch-Demo/index.html)
 
-* [stm32f103ze](https://github.com/zlgopen/awtk-stm32f103ze-raw)
+## VI. Platform Porting
 
-* [stm32f429igtx](https://github.com/zlgopen/awtk-stm32f429igtx-raw)
+* [For details, refer to the Joint Ecology Building Plan for AWTK](docs/awtk_ecology.md)
 
-* [stm32f767igtx](https://github.com/zlgopen/awtk-stm32f767igtx-raw)
+## VII. Language Binding
 
-* [linux-framebuffer(嵌入式Linux请用本项目)](https://github.com/zlgopen/awtk-linux-fb)
+* [AWTK Binding Code Generator](https://github.com/zlgopen/awtk-binding)
 
-## 各语言的绑定
+* [LUA Binding](https://github.com/zlgopen/awtk-lua)
 
-* [awtk-lua](https://github.com/zlgopen/awtk-lua)
+* [C++ Binding](https://github.com/zlgopen/awtk-cpp)
 
-* [awtk-js](https://github.com/zlgopen/awtk-js)
+* [JAVA Binding](https://github.com/zlgopen/awtk-java)
 
-## 相关工程
+* [Python Binding](https://github.com/zlgopen/awtk-python)
 
-* [模板工程](https://github.com/zlgopen/awtk-hello)
+* [MiniJVM Binding](https://github.com/zlgopen/awtk-minijvm)
 
-* [C示例代码](https://github.com/zlgopen/awtk-c-demos)
+* [JS-Binding QuickJS](https://github.com/zlgopen/awtk-quickjs)
 
-* [扩展控件实例: 二维码](https://github.com/CUITzhaoqi/awtk-qr)
+* [JS-Binding NodeJS](https://github.com/zlgopen/awtk-nodejs)
 
-## 文档
+* [JS-Binding JerryScript](https://github.com/zlgopen/awtk-jerryscript)
 
-[文档](docs/README.md)
+## VIII. Related Projects
 
-## 任务完成情况
+* [Template Project](https://github.com/zlgopen/awtk-hello)
 
-[任务完成情况](TODO.md)
+* [Demonstration Codes with C Program](https://github.com/zlgopen/awtk-c-demos)
 
-## 最新动态
+* [Wonderful Examples](https://github.com/zlgopen/awtk-examples)
 
-[最新动态](docs/changes.md)
+* [AWTK-MVVM](https://github.com/zlgopen/awtk-mvvm)
 
+* [MVC/MVVM Example Demonstration](https://github.com/zlgopen/awtk-patterns)
+
+* [Examples for Custom Widgets: Widget Generator](https://github.com/zlgopen/awtk-widget-generator)
+
+* [Examples for Custom Widgets: QR code](https://github.com/zlgopen/awtk-widget-qr)
+
+* [Examples for Custom Widgets: TinyGL](https://github.com/zlgopen/awtk-widget-glview)
+
+* [Examples for Custom Widgets: Number-label](https://github.com/zlgopen/awtk-widget-number-label)
+
+* [Examples for Custom Widgets: Code Editor](https://github.com/zlgopen/awtk-widget-code-edit)
+
+* [Examples for Custom Widgets: Date Picker](https://github.com/zlgopen/awtk-widget-date-picker)
+
+* [Examples for Custom Widgets: Table View](https://github.com/zlgopen/awtk-widget-table-view)
+
+* [Examples for Custom Font Loader](https://github.com/zlgopen/awtk-custom-font-loader)
+
+The third party provides: 
+
+* [react-awtk](https://github.com/wenyufei2018/react-awtk)
+
+* [Examples for Custom Widgets: QR code](https://github.com/CUITzhaoqi/awtk-qr)
+
+* [Examples for Custom Widgets: Circle Sliders](https://github.com/longyuwlz/awtk_slider_circle)
+
+
+## IX. Documentation
+
+* [Development Docs](docs/README.md)
+
+* [Change Logs](docs/changes.md)
+
+* [TODO](TODO.md)
+
+* [Beginners' Guide and Handbook](https://github.com/zlgopen/awtk-docs)
+
+## X. Joint Ecology Building Plan
+
+* [Joint Ecology Building Plan](docs/awtk_ecology.md)
+* In-depth Partners
+
+[![](docs/images/logo_nxp.svg)](https://www.nxp.com)　[![](docs/images/logo_anyka.jpg)](http://www.anyka.com)　[![](docs/images/logo_ingenic.jpg)](http://www.ingenic.com.cn)　[![](docs/images/logo_mindmotion.png)](http://www.mindmotion.com.cn)

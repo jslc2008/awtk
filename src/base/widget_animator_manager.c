@@ -1,9 +1,9 @@
-/**
+﻿/**
  * File:   widget_animator_manager.c
  * Author: AWTK Develop Team
  * Brief:  animator manager
  *
- * Copyright (c) 2018 - 2019  Guangzhou ZHIYUAN Electronics Co.,Ltd.
+ * Copyright (c) 2018 - 2020  Guangzhou ZHIYUAN Electronics Co.,Ltd.
  *
  * This program is distributed in the hope that it will be useful,
  * but WITHOUT ANY WARRANTY; without even the implied warranty of
@@ -24,18 +24,42 @@
 
 static widget_animator_manager_t* s_animator_manager;
 
+static ret_t widget_animator_manager_set_to_dispatch(widget_animator_manager_t* am) {
+  widget_animator_t* iter = am->first;
+
+  while (iter != NULL) {
+    iter->to_dispatch = TRUE;
+    iter = iter->next;
+  }
+
+  return RET_OK;
+}
+
+static widget_animator_t* widget_animator_manager_get_to_dispatch(widget_animator_manager_t* am) {
+  widget_animator_t* iter = am->first;
+
+  while (iter != NULL) {
+    if (iter->to_dispatch) {
+      return iter;
+    }
+    iter = iter->next;
+  }
+
+  return NULL;
+}
+
 ret_t widget_animator_manager_time_elapse(widget_animator_manager_t* am, uint32_t delta_time) {
   widget_animator_t* iter = NULL;
   return_value_if_fail(am != NULL, RET_BAD_PARAMS);
 
   delta_time = delta_time * am->time_scale;
+  widget_animator_manager_set_to_dispatch(am);
 
-  iter = am->first;
+  iter = widget_animator_manager_get_to_dispatch(am);
   while (iter != NULL) {
-    widget_animator_t* next = iter->next;
-
+    iter->to_dispatch = FALSE;
     widget_animator_time_elapse(iter, delta_time);
-    iter = next;
+    iter = widget_animator_manager_get_to_dispatch(am);
   }
 
   return RET_OK;
@@ -137,8 +161,9 @@ ret_t widget_animator_manager_remove(widget_animator_manager_t* am, widget_anima
   return_value_if_fail(am != NULL, RET_BAD_PARAMS);
   return_value_if_fail(animator != NULL, RET_BAD_PARAMS);
 
-  prev = am->first;
   iter = am->first;
+  return_value_if_fail(iter != NULL, ret);
+
   if (iter == animator) {
     am->first = iter->next;
     ret = RET_OK;
@@ -193,6 +218,8 @@ ret_t widget_animator_manager_remove_all(widget_animator_manager_t* am, widget_t
         widget_animator_destroy(iter);
         iter = prev->next;
       }
+
+      ret = RET_OK;
     } else {
       prev = iter;
       iter = prev->next;
@@ -287,4 +314,20 @@ uint32_t widget_animator_manager_count(widget_animator_manager_t* am) {
   }
 
   return count;
+}
+
+widget_animator_t* widget_animator_manager_find(widget_animator_manager_t* am, widget_t* widget,
+                                                const char* name) {
+  widget_animator_t* iter = NULL;
+  return_value_if_fail(am != NULL && widget != NULL, NULL);
+
+  iter = am->first;
+  while (iter != NULL) {
+    if (animator_is_equal(iter, widget, name)) {
+      return iter;
+    }
+    iter = iter->next;
+  }
+
+  return NULL;
 }

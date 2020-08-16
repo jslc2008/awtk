@@ -1,7 +1,6 @@
 ## widget\_type\_t
 ### 概述
- 控件的类型。
-
+控件的类型。
 ### 常量
 <p id="widget_type_t_consts">
 
@@ -10,10 +9,12 @@
 | WIDGET\_TYPE\_NONE | 无特殊类型。 |
 | WIDGET\_TYPE\_WINDOW\_MANAGER | 窗口管理器。 |
 | WIDGET\_TYPE\_NORMAL\_WINDOW | 普通窗口。 |
+| WIDGET\_TYPE\_OVERLAY | overlay窗口。 |
 | WIDGET\_TYPE\_TOOL\_BAR | 工具条。 |
 | WIDGET\_TYPE\_DIALOG | 对话框。 |
 | WIDGET\_TYPE\_POPUP | 弹出窗口。 |
 | WIDGET\_TYPE\_SYSTEM\_BAR | system bar window |
+| WIDGET\_TYPE\_SYSTEM\_BAR\_BOTTOM | system bar window ato bottom |
 | WIDGET\_TYPE\_SPRITE | 精灵窗口。 |
 | WIDGET\_TYPE\_KEYBOARD | 键盘窗口。 |
 | WIDGET\_TYPE\_DND | 拖放状态窗口。 |
@@ -32,6 +33,8 @@
 | WIDGET\_TYPE\_COMBO\_BOX | 下拉选择框控件。 |
 | WIDGET\_TYPE\_COMBO\_BOX\_ITEM | 下拉选择框的列表项控件。 |
 | WIDGET\_TYPE\_SLIDE\_VIEW | 滑动视图控件。 |
+| WIDGET\_TYPE\_SLIDE\_INDICATOR | 滑动视图的指示器控件。 |
+| WIDGET\_TYPE\_SLIDE\_INDICATOR\_ARC | 滑动视图的指示器控件（圆弧显示）。 |
 | WIDGET\_TYPE\_PAGES | 多页控件。 |
 | WIDGET\_TYPE\_TAB\_BUTTON | 标签按钮控件。 |
 | WIDGET\_TYPE\_TAB\_CONTROL | 标签控件。 |
@@ -50,6 +53,7 @@
 | WIDGET\_TYPE\_COLOR\_PICKER | 颜色选择器控件。 |
 | WIDGET\_TYPE\_COLOR\_COMPONENT | 颜色选择器组件控件。 |
 | WIDGET\_TYPE\_COLOR\_TILE | 颜色块控件。 |
+| WIDGET\_TYPE\_CLIP\_VIEW | 裁剪控件。 |
 | WIDGET\_TYPE\_RICH\_TEXT | 富文本控件。 |
 | WIDGET\_TYPE\_APP\_BAR | AppBar控件。 |
 | WIDGET\_TYPE\_GRID | 网格控件。 |

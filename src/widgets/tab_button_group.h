@@ -3,7 +3,7 @@
  * Author: AWTK Develop Team
  * Brief:  tab_button_group
  *
- * Copyright (c) 2018 - 2019  Guangzhou ZHIYUAN Electronics Co.,Ltd.
+ * Copyright (c) 2018 - 2020  Guangzhou ZHIYUAN Electronics Co.,Ltd.
  *
  * This program is distributed in the hope that it will be useful,
  * but WITHOUT ANY WARRANTY; without even the implied warranty of
@@ -23,6 +23,7 @@
 #define TK_TAB_BUTTON_GROUP_H
 
 #include "base/widget.h"
+#include "base/hscrollable.h"
 
 BEGIN_C_DECLS
 
@@ -48,7 +49,7 @@ BEGIN_C_DECLS
  * ```
  *
  * > 更多用法请参考：
- * [tab control](https://github.com/zlgopen/awtk/blob/master/demos/assets/raw/ui/)
+ * [tab control](https://github.com/zlgopen/awtk/blob/master/design/default/ui/)
  *
  * 可用通过style来设置控件的显示风格，如颜色等等。如：
  *
@@ -67,9 +68,21 @@ typedef struct _tab_button_group_t {
   /**
    * @property {bool_t} compact
    * @annotation ["set_prop","get_prop","readable","persitent","design","scriptable"]
-   * 紧凑型排版子控件。
+   * 紧凑型排版子控件(缺省FALSE)。
    */
   bool_t compact;
+
+  /**
+   * @property {bool_t} scrollable
+   * @annotation ["set_prop","get_prop","readable","persitent","design","scriptable"]
+   * 是否支持滚动(缺省FALSE)。
+   *
+   * > 紧凑型排版子控件时才支持滚动。
+   */
+  bool_t scrollable;
+
+  /*private*/
+  hscrollable_t* hscrollable;
 } tab_button_group_t;
 
 /**
@@ -85,6 +98,28 @@ typedef struct _tab_button_group_t {
  * @return {widget_t*} 对象。
  */
 widget_t* tab_button_group_create(widget_t* parent, xy_t x, xy_t y, wh_t w, wh_t h);
+
+/**
+ * @method tab_button_group_set_compact
+ * 设置compact。
+ * @annotation ["scriptable"]
+ * @param {widget_t*} widget 控件对象。
+ * @param {bool_t}  compact 是否使用紧凑布局(缺省FALSE)。
+ *
+ * @return {ret_t} 返回RET_OK表示成功，否则表示失败。
+ */
+ret_t tab_button_group_set_compact(widget_t* widget, bool_t compact);
+
+/**
+ * @method tab_button_group_set_scrollable
+ * 设置scrollable。
+ * @annotation ["scriptable"]
+ * @param {widget_t*} widget 控件对象。
+ * @param {bool_t}  scrollable 是否允许滚动(缺省FALSE)。
+ *
+ * @return {ret_t} 返回RET_OK表示成功，否则表示失败。
+ */
+ret_t tab_button_group_set_scrollable(widget_t* widget, bool_t scrollable);
 
 /**
  * @method tab_button_group_cast

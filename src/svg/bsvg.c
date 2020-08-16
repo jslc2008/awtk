@@ -3,7 +3,7 @@
  * Author: AWTK Develop Team
  * Brief:  binary svg
  *
- * Copyright (c) 2018 - 2019  Guangzhou ZHIYUAN Electronics Co.,Ltd.
+ * Copyright (c) 2018 - 2020  Guangzhou ZHIYUAN Electronics Co.,Ltd.
  *
  * This program is distributed in the hope that it will be useful,
  * but WITHOUT ANY WARRANTY; without even the implied warranty of
@@ -33,7 +33,7 @@ bsvg_t* bsvg_init(bsvg_t* svg, const uint32_t* data, uint32_t size) {
 }
 
 const uint8_t* bsvg_visit_path(const uint8_t* p, void* ctx, tk_visit_t on_path) {
-  const svg_path_t* path = (const svg_path_t*)p;
+  const svg_path_t* path = NULL;
   do {
     path = (const svg_path_t*)p;
     on_path(ctx, path);

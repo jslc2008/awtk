@@ -1,9 +1,9 @@
-/**
+﻿/**
  * File:   children_layouter_default_default.c
  * Author: AWTK Develop Team
  * Brief:  children layouter default
  *
- * Copyright (c) 2018 - 2019  Guangzhou ZHIYUAN Electronics Co.,Ltd.
+ * Copyright (c) 2018 - 2020  Guangzhou ZHIYUAN Electronics Co.,Ltd.
  *
  * This program is distributed in the hope that it will be useful,
  * but WITHOUT ANY WARRANTY; without even the implied warranty of
@@ -21,6 +21,7 @@
 
 #include "tkc/rect.h"
 #include "tkc/utils.h"
+#include "base/layout.h"
 #include "base/widget.h"
 #include "tkc/tokenizer.h"
 #include "layouters/self_layouter_default.h"
@@ -59,6 +60,20 @@ static const char* children_layouter_default_to_string(children_layouter_t* layo
   if (layout->spacing) {
     tk_snprintf(temp, sizeof(temp) - 1, "s=%d,", (int)(layout->spacing));
     str_append(str, temp);
+  }
+
+  if (!(layout->keep_disable)) {
+    str_append(str, "keep_disable=false,");
+  }
+
+  if (layout->keep_invisible) {
+    str_append(str, "keep_invisible=true,");
+  }
+
+  if (layout->align_h == ALIGN_H_CENTER) {
+    str_append(str, "align_h=center,");
+  } else if (layout->align_h == ALIGN_H_RIGHT) {
+    str_append(str, "align_h=right,");
   }
 
   str_trim_right(str, ",");
@@ -108,6 +123,26 @@ static ret_t children_layouter_default_set_param(children_layouter_t* layouter, 
     }
     case 's': {
       l->spacing = val;
+      break;
+    }
+    case 'a': {
+      const char* align_h = value_str(v);
+      return_value_if_fail(align_h != NULL, RET_BAD_PARAMS);
+
+      if (*align_h == 'r') {
+        l->align_h = ALIGN_H_RIGHT;
+      } else if (*align_h == 'c') {
+        l->align_h = ALIGN_H_CENTER;
+      } else {
+        l->align_h = ALIGN_H_LEFT;
+      }
+    }
+    case 'k': {
+      if (strstr(name, "invisible") != NULL || name[1] == 'i') {
+        l->keep_invisible = value_bool(v);
+      } else if (strstr(name, "disable") != NULL || name[1] == 'd') {
+        l->keep_disable = value_bool(v);
+      }
       break;
     }
     default:
@@ -170,6 +205,20 @@ static ret_t children_layouter_default_get_param(children_layouter_t* layouter, 
       value_set_int(v, l->spacing);
       return RET_OK;
     }
+    case 'a': {
+      value_set_int(v, l->align_h);
+      return RET_OK;
+    }
+    case 'k': {
+      if (strstr(name, "invisible") != NULL || name[1] == 'i') {
+        value_set_bool(v, l->keep_invisible);
+        return RET_OK;
+      } else if (strstr(name, "disable") != NULL || name[1] == 'd') {
+        value_set_bool(v, l->keep_disable);
+        return RET_OK;
+      }
+      break;
+    }
     default: {
       assert(!"not support param");
       break;
@@ -177,30 +226,6 @@ static ret_t children_layouter_default_get_param(children_layouter_t* layouter, 
   }
 
   return RET_FAIL;
-}
-
-static widget_t** children_layouter_default_get_children(widget_t* widget,
-                                                         widget_t** stack_children, uint32_t* nr) {
-  uint32_t s = 0;
-  uint32_t d = 0;
-  uint32_t n = widget->children->size;
-  widget_t** src = (widget_t**)(widget->children->elms);
-  widget_t** dst = (n > *nr) ? (widget_t**)TKMEM_ALLOC(n * sizeof(widget_t*)) : stack_children;
-  return_value_if_fail(dst != NULL, NULL);
-
-  for (s = 0, d = 0; s < n; s++) {
-    widget_t* iter = src[s];
-    if (iter->floating) {
-      widget_layout(iter);
-      continue;
-    }
-
-    dst[d++] = iter;
-  }
-
-  *nr = d;
-
-  return dst;
 }
 
 static ret_t children_layouter_default_layout(children_layouter_t* layouter, widget_t* widget) {
@@ -220,24 +245,27 @@ static ret_t children_layouter_default_layout(children_layouter_t* layouter, wid
   rect_t area = {0, 0, 0, 0};
   widget_t* iter = NULL;
   widget_t** children = NULL;
-  widget_t* stack_children[5];
+  darray_t children_for_layout;
   children_layouter_default_t* layout = (children_layouter_default_t*)layouter;
 
   if (widget->children == NULL) {
     return RET_OK;
   }
-  n = ARRAY_SIZE(stack_children);
 
-  children = children_layouter_default_get_children(widget, stack_children, &n);
-  return_value_if_fail(children != NULL, RET_OOM);
+  widget_layout_floating_children(widget);
+  darray_init(&children_for_layout, widget->children->size, NULL, NULL);
+  return_value_if_fail(
+      widget_get_children_for_layout(widget, &children_for_layout, layout->keep_disable,
+                                     layout->keep_invisible) == RET_OK,
+      RET_BAD_PARAMS);
 
-  if (n < 1) {
-    if (children != stack_children) {
-      TKMEM_FREE(children);
-    }
+  n = children_for_layout.size;
+  if (children_for_layout.size < 1) {
+    darray_deinit(&(children_for_layout));
     return RET_OK;
   }
 
+  children = (widget_t**)(children_for_layout.elms);
   layout_w = widget_get_prop_int(widget, WIDGET_PROP_LAYOUT_W, widget->w);
   layout_h = widget_get_prop_int(widget, WIDGET_PROP_LAYOUT_H, widget->h);
 
@@ -248,18 +276,20 @@ static ret_t children_layouter_default_layout(children_layouter_t* layouter, wid
   spacing = layout->spacing;
 
   if (layout->rows_is_height) {
-    rows = tk_roundi((layout_h - 2.0f * y_margin) / (layout->rows + spacing));
+    rows = tk_roundi((layout_h - 2.0f * y_margin + spacing) / (layout->rows + spacing));
   } else {
     rows = layout->rows;
   }
 
   if (layout->cols_is_width) {
-    cols = tk_roundi((layout_w - 2.0f * x_margin) / (layout->cols + spacing));
+    cols = tk_roundi((layout_w - 2.0f * x_margin + spacing) / (layout->cols + spacing));
   } else {
     cols = layout->cols;
   }
 
   if (rows == 1 && cols == 0) { /*hbox*/
+    uint32_t xoffset = x;
+    uint32_t children_w = 0;
     h = layout_h - 2 * y_margin;
     w = layout_w - 2 * x_margin - (n - 1) * spacing;
 
@@ -275,9 +305,28 @@ static ret_t children_layouter_default_layout(children_layouter_t* layouter, wid
 
     for (i = 0; i < n; i++) {
       iter = children[i];
+      children_w += iter->w + spacing;
+    }
+    children_w -= spacing;
+
+    switch (layout->align_h) {
+      case ALIGN_H_RIGHT: {
+        xoffset = layout_w - x_margin - children_w;
+        break;
+      }
+      case ALIGN_H_CENTER: {
+        xoffset = (layout_w - children_w) / 2;
+        break;
+      }
+      default:
+        break;
+    }
+
+    x = xoffset;
+    for (i = 0; i < n; i++) {
+      iter = children[i];
       widget_move_resize(iter, x, y, iter->w, h);
       x += iter->w + spacing;
-      return_value_if_fail(x <= layout_w, RET_BAD_PARAMS);
     }
 
     for (i = 0; i < n; i++) {
@@ -298,7 +347,6 @@ static ret_t children_layouter_default_layout(children_layouter_t* layouter, wid
 
     for (i = 0; i < n; i++) {
       iter = children[i];
-      return_value_if_fail(y <= layout_h, RET_BAD_PARAMS);
       widget_move_resize(iter, x, y, w, iter->h);
       y += iter->h + spacing;
     }
@@ -334,6 +382,14 @@ static ret_t children_layouter_default_layout(children_layouter_t* layouter, wid
       area = rect_init(x, y, item_w, item_h);
       widget_move_resize(iter, x, y, item_w, item_h);
       if (self_layouter_default_is_valid(iter->self_layout)) {
+        if (self_layouter_get_param_int(iter->self_layout, "x_attr", 0) == X_ATTR_UNDEF) {
+          self_layouter_set_param_str(iter->self_layout, "x", "0");
+        }
+
+        if (self_layouter_get_param_int(iter->self_layout, "y_attr", 0) == Y_ATTR_UNDEF) {
+          self_layouter_set_param_str(iter->self_layout, "y", "0");
+        }
+
         widget_layout_self_with_rect(iter->self_layout, iter, &area);
       }
 
@@ -353,9 +409,7 @@ static ret_t children_layouter_default_layout(children_layouter_t* layouter, wid
     log_debug("not supported(rows=%d, cols=%d)\n", rows, cols);
   }
 
-  if (children != stack_children) {
-    TKMEM_FREE(children);
-  }
+  darray_deinit(&(children_for_layout));
 
   return RET_OK;
 }
@@ -374,8 +428,19 @@ static ret_t children_layouter_default_destroy(children_layouter_t* layouter) {
   return RET_OK;
 }
 
+static children_layouter_t* children_layouter_default_clone(children_layouter_t* layouter) {
+  children_layouter_default_t* l = TKMEM_ZALLOC(children_layouter_default_t);
+
+  memcpy(l, layouter, sizeof(*l));
+  str_init(&(l->layouter.params), 0);
+  str_set(&(l->layouter.params), layouter->params.str);
+
+  return (children_layouter_t*)l;
+}
+
 static const children_layouter_vtable_t s_children_layouter_default_vtable = {
     .type = "default",
+    .clone = children_layouter_default_clone,
     .to_string = children_layouter_default_to_string,
     .get_param = children_layouter_default_get_param,
     .set_param = children_layouter_default_set_param,
@@ -390,10 +455,10 @@ children_layouter_t* children_layouter_default_create(void) {
   layouter = TKMEM_ZALLOC(children_layouter_default_t);
   return_value_if_fail(layouter != NULL, NULL);
 
+  layouter->keep_disable = TRUE;
   l = (children_layouter_t*)layouter;
 
   str_init(&(l->params), 0);
   l->vt = &s_children_layouter_default_vtable;
-
   return (children_layouter_t*)layouter;
 }

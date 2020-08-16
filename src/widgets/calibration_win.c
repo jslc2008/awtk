@@ -3,7 +3,7 @@
  * Author: AWTK Develop Team
  * Brief:  touch screen calibration win
  *
- * Copyright (c) 2018 - 2019  Guangzhou ZHIYUAN Electronics Co.,Ltd.
+ * Copyright (c) 2018 - 2020  Guangzhou ZHIYUAN Electronics Co.,Ltd.
  *
  * This program is distributed in the hope that it will be useful,
  * but WITHOUT ANY WARRANTY; without even the implied warranty of
@@ -20,13 +20,14 @@
  */
 
 #include "tkc/mem.h"
-#include "widgets/window.h"
+#include "base/window.h"
 #include "base/window_manager.h"
 #include "widgets/calibration_win.h"
 
 static point_t calibration_win_get_current_point(widget_t* widget, uint32_t point_name) {
   point_t pt = {0, 0};
   calibration_win_t* win = CALIBRATION_WIN(widget);
+  return_value_if_fail(win != NULL, pt);
 
   switch (point_name) {
     case PT_TOP_LEFT: {
@@ -61,6 +62,8 @@ static point_t calibration_win_get_current_point(widget_t* widget, uint32_t poin
 
 static ret_t calibration_win_invalidate(widget_t* widget, uint32_t point_name) {
   calibration_win_t* win = CALIBRATION_WIN(widget);
+  return_value_if_fail(win != NULL && widget != NULL, RET_BAD_PARAMS);
+
   if (point_name < PT_MAX_NR) {
     uint32_t cross_size = win->cross_size;
     point_t pt = calibration_win_get_current_point(widget, point_name);
@@ -76,11 +79,21 @@ static ret_t calibration_win_invalidate(widget_t* widget, uint32_t point_name) {
 static ret_t calibration_win_on_event(widget_t* widget, event_t* e) {
   uint16_t type = e->type;
   calibration_win_t* win = CALIBRATION_WIN(widget);
+  return_value_if_fail(widget != NULL && win != NULL, RET_BAD_PARAMS);
+
   if (win->cursor == PT_MAX_NR) {
     return RET_OK;
   }
 
   switch (type) {
+    case EVT_WINDOW_OPEN: {
+      widget_grab(widget->parent, widget);
+      return RET_OK;
+    }
+    case EVT_WINDOW_CLOSE: {
+      widget_ungrab(widget->parent, widget);
+      return RET_OK;
+    }
     case EVT_POINTER_UP: {
       point_t* p = win->points + win->cursor;
       pointer_event_t* evt = (pointer_event_t*)e;
@@ -98,7 +111,6 @@ static ret_t calibration_win_on_event(widget_t* widget, event_t* e) {
       calibration_win_invalidate(widget, win->cursor);
 
       if (win->cursor == PT_MAX_NR) {
-        p = win->points;
         if (win->on_done != NULL) {
           if (win->on_done(win->on_done_ctx, win->points) == RET_OK) {
             window_close(widget);
@@ -108,10 +120,13 @@ static ret_t calibration_win_on_event(widget_t* widget, event_t* e) {
         } else {
           window_close(widget);
         }
+#if 0        
+        p = win->points;
         log_debug("lt:{%d,%d} lr:{%d,%d} br:{%d,%d} bl:{%d,%d} center:{%d,%d}\n", p[PT_TOP_LEFT].x,
                   p[PT_TOP_LEFT].y, p[PT_TOP_RIGHT].x, p[PT_TOP_RIGHT].y, p[PT_BOTTOM_RIGHT].x,
                   p[PT_BOTTOM_RIGHT].y, p[PT_BOTTOM_LEFT].x, p[PT_BOTTOM_LEFT].y, p[PT_CENTER].x,
                   p[PT_CENTER].y);
+#endif
       }
       break;
     }
@@ -156,7 +171,8 @@ TK_DECL_VTABLE(calibration_win) = {.size = sizeof(calibration_win_t),
                                    .get_prop = window_base_get_prop,
                                    .on_paint_begin = window_base_on_paint_begin,
                                    .on_paint_end = window_base_on_paint_end,
-                                   .on_paint_self = calibration_win_on_paint_self};
+                                   .on_paint_self = calibration_win_on_paint_self,
+                                   .on_destroy = window_base_on_destroy};
 
 ret_t calibration_win_set_on_done(widget_t* widget, calibration_win_on_done_t on_done, void* ctx) {
   calibration_win_t* win = CALIBRATION_WIN(widget);

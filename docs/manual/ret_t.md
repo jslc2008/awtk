@@ -1,6 +1,6 @@
 ## ret\_t
 ### 概述
- 函数返回值常量定义。
+函数返回值常量定义。
 ### 常量
 <p id="ret_t_consts">
 
@@ -18,7 +18,12 @@
 | RET\_NOT\_FOUND | 没找到。 |
 | RET\_DONE | 操作完成。 |
 | RET\_STOP | 停止后续操作。 |
+| RET\_SKIP | 跳过当前项。 |
 | RET\_CONTINUE | 继续后续操作。 |
 | RET\_OBJECT\_CHANGED | 对象属性变化。 |
 | RET\_ITEMS\_CHANGED | 集合数目变化。 |
 | RET\_BAD\_PARAMS | 无效参数。 |
+| RET\_TIMEOUT | 超时。 |
+| RET\_CRC | CRC错误。 |
+| RET\_IO | IO错误。 |
+| RET\_EOS | End of Stream |

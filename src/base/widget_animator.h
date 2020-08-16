@@ -3,7 +3,7 @@
  * Author: AWTK Develop Team
  * Brief:  widget animator interface
  *
- * Copyright (c) 2018 - 2019  Guangzhou ZHIYUAN Electronics Co.,Ltd.
+ * Copyright (c) 2018 - 2020  Guangzhou ZHIYUAN Electronics Co.,Ltd.
  *
  * This program is distributed in the hope that it will be useful,
  * but WITHOUT ANY WARRANTY; without even the implied warranty of
@@ -27,12 +27,6 @@
 #include "tkc/emitter.h"
 
 BEGIN_C_DECLS
-
-struct _widget_animator_manager_t;
-typedef struct _widget_animator_manager_t widget_animator_manager_t;
-
-struct _widget_animator_t;
-typedef struct _widget_animator_t widget_animator_t;
 
 typedef ret_t (*widget_animator_update_t)(widget_animator_t* animator, float_t percent);
 typedef ret_t (*widget_animator_destroy_t)(widget_animator_t* animator);
@@ -176,8 +170,11 @@ struct _widget_animator_t {
   widget_animator_destroy_t destroy;
 
   /*private*/
+  bool_t to_dispatch;
   struct _widget_animator_t* next;
   widget_animator_manager_t* widget_animator_manager;
+  uint32_t total_yoyo_times;
+  uint32_t total_repeat_times;
 };
 
 /**

@@ -3,7 +3,7 @@
  * Author: AWTK Develop Team
  * Brief:  simple memory manager
  *
- * Copyright (c) 2018 - 2019  Guangzhou ZHIYUAN Electronics Co.,Ltd.
+ * Copyright (c) 2018 - 2020  Guangzhou ZHIYUAN Electronics Co.,Ltd.
  *
  * This program is distributed in the hope that it will be useful,
  * but WITHOUT ANY WARRANTY; without even the implied warranty of
@@ -21,478 +21,154 @@
 
 #include "tkc/mem.h"
 #include "tkc/time_now.h"
+#include "tkc/mem_allocator_oom.h"
+#include "tkc/mem_allocator_pool.h"
 
-static void tk_free_impl(void* ptr);
-static void* tk_alloc_impl(uint32_t size);
-static void* tk_realloc_impl(void* ptr, uint32_t size);
-static void* tk_calloc_impl(uint32_t nmemb, uint32_t size);
+static mem_allocator_oom_t s_oom;
+
+#ifdef ENABLE_MEM_LEAK_CHECK
+#include "tkc/mem_allocator_debug.h"
+static mem_allocator_debug_t s_debug;
+#endif /*ENABLE_MEM_LEAK_CHECK*/
+
+static mem_allocator_t* s_allocator = NULL;
+
+#define MAX_BLOCK_SIZE 0xffff0000
 
 #ifdef HAS_STD_MALLOC
+#include "tkc/mem_allocator_std.h"
 
-#define MEM_MAGIC 0x11223344
-typedef struct _mem_block_t {
-  uint32_t magic;
-  uint32_t size;
-} mem_block_t;
-
-static mem_stat_t s_mem_stat;
-mem_stat_t tk_mem_stat(void) {
-  return s_mem_stat;
+bool_t tk_mem_is_valid_addr(void* addr) {
+  return ((uint64_t)addr > 0x10000);
 }
 
-ret_t tk_mem_init(void* buffer, uint32_t size) {
-  (void)buffer;
-  (void)size;
+static mem_allocator_t* mem_allocator_get(void) {
+  static mem_allocator_t std;
+  if (s_allocator != NULL) {
+    return s_allocator;
+  }
 
+  s_allocator = mem_allocator_std_init(&std);
+#ifdef ENABLE_MEM_LEAK_CHECK
+  s_allocator = mem_allocator_debug_init(&s_debug, s_allocator);
+#endif /*ENABLE_MEM_LEAK_CHECK*/
+  s_allocator = mem_allocator_oom_init(&s_oom, s_allocator);
+
+  return s_allocator;
+}
+
+ret_t tk_mem_init_stage2(void) {
   return RET_OK;
-}
-
-static void* tk_alloc_impl(uint32_t size) {
-  uint32_t s = size + sizeof(mem_block_t);
-  void* ptr = malloc(s);
-
-  if (ptr != NULL) {
-    mem_block_t* head = (mem_block_t*)ptr;
-
-    head->size = s;
-    head->magic = MEM_MAGIC;
-
-    s_mem_stat.used_bytes += head->size;
-    s_mem_stat.used_block_nr++;
-
-    return (char*)ptr + sizeof(mem_block_t);
-  } else {
-    log_warn("out of memory: size=%u\n", size);
-    return NULL;
-  }
-}
-
-static void* tk_realloc_impl(void* ptr, uint32_t size) {
-  if (ptr != NULL) {
-    mem_block_t* head = (mem_block_t*)((char*)ptr - sizeof(mem_block_t));
-    uint32_t old_size = head->size - sizeof(mem_block_t);
-
-    if (size <= old_size) {
-      return ptr;
-    } else {
-      void* newptr = tk_alloc_impl(size);
-      if (newptr) {
-        memcpy(newptr, ptr, tk_min(size, old_size));
-        tk_free_impl(ptr);
-
-        return newptr;
-      } else {
-        return ptr;
-      }
-    }
-
-  } else {
-    return tk_alloc_impl(size);
-  }
-}
-
-static void tk_free_impl(void* ptr) {
-  if (ptr != NULL) {
-    mem_block_t* head = (mem_block_t*)((char*)ptr - sizeof(mem_block_t));
-
-    assert(head->magic == MEM_MAGIC);
-    s_mem_stat.used_bytes -= head->size;
-    s_mem_stat.used_block_nr--;
-
-    free(head);
-  }
 }
 
 #else /*non std memory manager*/
-typedef struct _free_node_t {
-  uint32_t size;
-  struct _free_node_t* next;
-  struct _free_node_t* prev;
-} free_node_t;
+#include "tkc/mem_allocator_lock.h"
+#include "tkc/mem_allocator_simple.h"
 
-typedef struct _mem_info_t {
-  char* buffer;
-  uint32_t size;
-  uint32_t used_bytes;
-  uint32_t used_block_nr;
-  free_node_t* free_list;
-} mem_info_t;
+static mem_allocator_lock_t s_lock;
 
-#define R8B(size) (((size + 7) >> 3) << 3)
-#define MIN_SIZE R8B(sizeof(free_node_t))
-#define REAL_SIZE(size) R8B((size > sizeof(free_node_t) ? size : MIN_SIZE) + sizeof(uint32_t));
+static void* s_heap_start = NULL;
+static uint32_t s_heap_size = 0;
 
-static mem_info_t s_mem_info;
+bool_t tk_mem_is_valid_addr(void* addr) {
+  uint64_t start = (uint64_t)s_heap_start;
+  uint64_t end = start + s_heap_size;
 
-static void* tk_alloc_impl(uint32_t s) {
-  free_node_t* iter = NULL;
-  uint32_t size = REAL_SIZE(s);
-
-  /*查找第一个满足条件的空闲块*/
-  for (iter = s_mem_info.free_list; iter != NULL; iter = iter->next) {
-    if (iter->size > size) {
-      break;
-    }
-  }
-
-  if (iter == NULL) {
-    log_debug("%s: Out of memory(%d):\n", __FUNCTION__, (int)size);
-  }
-
-  return_value_if_fail(iter != NULL, NULL);
-
-  /*如果找到的空闲块刚好满足需求，就从空闲块链表中移出它*/
-  if (iter->size < (size + MIN_SIZE)) {
-    if (s_mem_info.free_list == iter) {
-      s_mem_info.free_list = iter->next;
-    }
-
-    if (iter->prev != NULL) {
-      iter->prev->next = iter->next;
-    }
-    if (iter->next != NULL) {
-      iter->next->prev = iter->prev;
-    }
-  } else {
-    /*如果找到的空闲块比较大，就把它拆成两个块，把多余的空闲内存放回去*/
-    free_node_t* new_iter = (free_node_t*)((char*)iter + size);
-
-    new_iter->size = iter->size - size;
-    new_iter->next = iter->next;
-    new_iter->prev = iter->prev;
-
-    if (iter->prev != NULL) {
-      iter->prev->next = new_iter;
-    }
-    if (iter->next != NULL) {
-      iter->next->prev = new_iter;
-    }
-
-    if (s_mem_info.free_list == iter) {
-      s_mem_info.free_list = new_iter;
-    }
-    iter->size = size;
-  }
-  /*返回可用的内存*/
-  s_mem_info.used_block_nr++;
-  s_mem_info.used_bytes += size;
-
-  return (char*)iter + sizeof(uint32_t);
-}
-
-static void node_merge2(free_node_t* prev, free_node_t* next) {
-  return_if_fail(prev != NULL && next != NULL && prev->next == next);
-
-  prev->next = next->next;
-  if (next->next != NULL) {
-    next->next->prev = prev;
-  }
-  prev->size += next->size;
-
-  if (s_mem_info.free_list == next) {
-    s_mem_info.free_list = prev;
-  }
-
-  return;
-}
-
-static void node_merge(free_node_t* iter) {
-  free_node_t* prev = iter->prev;
-  free_node_t* next = iter->next;
-
-  if (prev != NULL && ((char*)prev + prev->size) == (char*)iter) {
-    node_merge2(prev, iter);
-    node_merge(prev);
-  } else if (next != NULL && ((char*)iter + iter->size) == (char*)next) {
-    node_merge2(iter, next);
-    node_merge(iter);
-  }
-
-  return;
-}
-
-static void tk_free_impl(void* ptr) {
-  uint32_t size = 0;
-  free_node_t* iter = NULL;
-  free_node_t* free_iter = NULL;
-
-  return_if_fail(ptr != NULL);
-
-  free_iter = (free_node_t*)((char*)ptr - sizeof(uint32_t));
-
-  size = free_iter->size;
-  free_iter->prev = NULL;
-  free_iter->next = NULL;
-
-  if (s_mem_info.free_list == NULL) {
-    s_mem_info.free_list = free_iter;
-
-    return;
-  }
-  /*根据内存块地址的大小，把它插入到适当的位置。*/
-  for (iter = s_mem_info.free_list; iter != NULL; iter = iter->next) {
-    if ((char*)iter > (char*)free_iter) {
-      free_iter->next = iter;
-      free_iter->prev = iter->prev;
-      if (iter->prev != NULL) {
-        iter->prev->next = free_iter;
-      }
-      iter->prev = free_iter;
-
-      if (s_mem_info.free_list == iter) {
-        s_mem_info.free_list = free_iter;
-      }
-
-      break;
-    }
-
-    if (iter->next == NULL) {
-      iter->next = free_iter;
-      free_iter->prev = iter;
-
-      break;
-    }
-  }
-
-  /*对相邻居的内存进行合并*/
-  node_merge(free_iter);
-  s_mem_info.used_block_nr--;
-  s_mem_info.used_bytes -= size;
-
-  return;
-}
-
-static void* tk_realloc_impl(void* ptr, uint32_t size) {
-  void* new_ptr = NULL;
-
-  if (ptr != NULL) {
-    uint32_t old_size = *(uint32_t*)((char*)ptr - sizeof(uint32_t)) - sizeof(uint32_t);
-    if (old_size >= size && old_size <= (size + MIN_SIZE)) {
-      return ptr;
-    }
-
-    new_ptr = tk_alloc_impl(size);
-    if (new_ptr != NULL) {
-      memcpy(new_ptr, ptr, size < old_size ? size : old_size);
-      tk_free_impl(ptr);
-    }
-  } else {
-    new_ptr = tk_alloc_impl(size);
-  }
-
-  return new_ptr;
+  return (((uint64_t)addr >= (uint64_t)start) && ((uint64_t)addr < end));
 }
 
 ret_t tk_mem_init(void* buffer, uint32_t size) {
-  return_value_if_fail(buffer != NULL && size > MIN_SIZE, RET_BAD_PARAMS);
+  static mem_allocator_simple_t simple;
+  static mem_allocator_pool_t pool;
 
-  memset(buffer, 0x00, size);
-  s_mem_info.buffer = (char*)buffer;
-  s_mem_info.size = size;
-  s_mem_info.free_list = (free_node_t*)buffer;
-  s_mem_info.free_list->prev = NULL;
-  s_mem_info.free_list->next = NULL;
-  s_mem_info.free_list->size = size;
-  s_mem_info.used_block_nr = 0;
+  s_heap_size = size;
+  s_heap_start = buffer;
+
+  s_allocator = mem_allocator_simple_init(&simple, buffer, size);
+  if (size < 100 * 1024) {
+    s_allocator = mem_allocator_pool_init(&pool, s_allocator, 100, 100, 80, 80, 32);
+  } else if (size < 1000 * 1024) {
+    s_allocator = mem_allocator_pool_init(&pool, s_allocator, 500, 500, 500, 200, 200);
+  } else {
+    s_allocator = mem_allocator_pool_init(&pool, s_allocator, 1000, 1000, 1000, 500, 500);
+  }
+#ifdef ENABLE_MEM_LEAK_CHECK
+  s_allocator = mem_allocator_debug_init(&s_debug, s_allocator);
+#endif /*ENABLE_MEM_LEAK_CHECK*/
+
+  return s_allocator != NULL ? RET_OK : RET_FAIL;
+}
+
+ret_t tk_mem_init_stage2(void) {
+  return_value_if_fail(s_allocator != NULL, RET_FAIL);
+  s_allocator = mem_allocator_lock_init(&s_lock, s_allocator);
+  s_allocator = mem_allocator_oom_init(&s_oom, s_allocator);
 
   return RET_OK;
 }
 
-mem_stat_t tk_mem_stat() {
-  mem_stat_t st;
-
-  st.used_bytes = s_mem_info.size;
-  st.used_block_nr = s_mem_info.used_block_nr;
-
-  return st;
+static mem_allocator_t* mem_allocator_get(void) {
+  return s_allocator;
 }
 
+#ifndef WITH_SDL
 /*export std malloc*/
 void* calloc(size_t count, size_t size) {
-  return tk_calloc_impl(count, size);
+  return tk_calloc(count, size, __FUNCTION__, __LINE__);
 }
 
 void free(void* ptr) {
-  tk_free_impl(ptr);
+  tk_free(ptr);
 }
 
 void* malloc(size_t size) {
-  return tk_alloc_impl(size);
+  return tk_alloc(size, __FUNCTION__, __LINE__);
 }
 
 void* realloc(void* ptr, size_t size) {
-  return tk_realloc_impl(ptr, size);
+  return tk_realloc(ptr, size, __FUNCTION__, __LINE__);
 }
+#endif /*WITH_SDL*/
+
 #endif /*HAS_STD_MALLOC*/
 
-static void* tk_calloc_impl(uint32_t nmemb, uint32_t s) {
-  uint32_t size = nmemb * s;
-  void* ptr = tk_alloc_impl(size);
-
-  if (ptr != NULL) {
-    memset(ptr, 0x00, size);
-  }
-
-  return ptr;
-}
-
-#ifdef ENABLE_MEM_LEAK_CHECK
-#include "tkc/time_now.h"
-
-typedef struct _mem_record_t {
-  void* ptr;
-  const char* func;
-  uint32_t line;
-  uint32_t size;
-  uint32_t time;
-} mem_record_t;
-
-#ifndef MEM_MAX_RECORDS
-#define MEM_MAX_RECORDS 4 * 1024
-#endif /*MEM_MAX_RECORDS*/
-
-static mem_record_t s_records[MEM_MAX_RECORDS];
-
-static void tk_remove_record(void* ptr) {
-  uint32_t i = 0;
-
-  for (i = 0; i < MEM_MAX_RECORDS; i++) {
-    mem_record_t* r = (mem_record_t*)s_records + i;
-
-    if (r->ptr == ptr) {
-      memset(r, 0x00, sizeof(mem_record_t));
-      break;
-    }
-  }
-}
-
-static void* tk_add_record(void* ptr, uint32_t size, const char* func, uint32_t line) {
-  uint32_t i = 0;
-
-  for (i = 0; i < MEM_MAX_RECORDS; i++) {
-    mem_record_t* r = (mem_record_t*)s_records + i;
-
-    if (r->ptr == NULL) {
-      r->ptr = ptr;
-      r->func = func;
-      r->line = line;
-      r->size = size;
-      r->time = time_now_s();
-
-      break;
-    }
-  }
-
-  return ptr;
-}
-
-void tk_mem_dump(void) {
-  uint32_t i = 0;
-  uint32_t size = 0;
-  uint32_t big_size = 10240;
-  uint32_t time = time_now_s();
-  mem_stat_t s = tk_mem_stat();
-
-  log_debug("===============large=========================\n");
-  for (i = 0; i < MEM_MAX_RECORDS; i++) {
-    mem_record_t* r = (mem_record_t*)s_records + i;
-
-    if (r->ptr != NULL) {
-      if (r->size >= big_size) {
-        log_debug("%p size=%u time=%d, %s:%u\n", r->ptr, r->size, r->time, r->func, r->line);
-        size += r->size;
-      }
-    }
-  }
-  log_debug("large blocks size: %d\n", size);
-  log_debug("================small========================\n");
-  for (i = 0, size = 0; i < MEM_MAX_RECORDS; i++) {
-    mem_record_t* r = (mem_record_t*)s_records + i;
-
-    if (r->ptr != NULL) {
-      if (r->size < big_size) {
-        log_debug("%p size=%u time=%d, %s:%u\n", r->ptr, r->size, r->time, r->func, r->line);
-        size += r->size;
-      }
-    }
-  }
-  log_debug("small blocks size: %d\n", size);
-
-  log_debug("================recent========================\n");
-  for (i = 0, size = 0; i < MEM_MAX_RECORDS; i++) {
-    mem_record_t* r = (mem_record_t*)s_records + i;
-
-    if (r->ptr != NULL) {
-      if ((time - r->time) < 10) {
-        log_debug("%p size=%u time=%d, %s:%u\n", r->ptr, r->size, r->time, r->func, r->line);
-        size += r->size;
-      }
-    }
-  }
-  log_debug("recent blocks size: %d\n", size);
-
-  log_debug("used: %d bytes %d blocks\n", s.used_bytes, s.used_block_nr);
-}
-
 void* tk_calloc(uint32_t nmemb, uint32_t size, const char* func, uint32_t line) {
-  return tk_add_record(tk_calloc_impl(nmemb, size), nmemb * size, func, line);
+  void* addr = NULL;
+  uint32_t total_size = size * nmemb;
+  mem_allocator_t* allocator = mem_allocator_get();
+  return_value_if_fail(allocator != NULL, NULL);
+
+  addr = mem_allocator_alloc(allocator, total_size, func, line);
+  return_value_if_fail(addr != NULL, NULL);
+  memset(addr, 0x00, total_size);
+
+  return addr;
 }
 
 void* tk_realloc(void* ptr, uint32_t size, const char* func, uint32_t line) {
-  void* newptr = tk_realloc_impl(ptr, size);
+  mem_allocator_t* allocator = mem_allocator_get();
+  return_value_if_fail(allocator != NULL, NULL);
 
-  if (newptr == ptr) {
-    return newptr;
-  }
-
-  if (ptr != NULL) {
-    tk_remove_record(ptr);
-  }
-
-  return tk_add_record(newptr, size, func, line);
+  return mem_allocator_realloc(allocator, ptr, size, func, line);
 }
 
 void* tk_alloc(uint32_t size, const char* func, uint32_t line) {
-  return tk_add_record(tk_alloc_impl(size), size, func, line);
+  mem_allocator_t* allocator = mem_allocator_get();
+  return_value_if_fail(allocator != NULL, NULL);
+
+  return mem_allocator_alloc(allocator, size, func, line);
 }
 
 void tk_free(void* ptr) {
-  if (ptr != NULL) {
-    tk_remove_record(ptr);
-    tk_free_impl(ptr);
-  }
-}
-#else
-void* tk_calloc(uint32_t nmemb, uint32_t size, const char* func, uint32_t line) {
-  (void)func;
-  (void)line;
+  mem_allocator_t* allocator = mem_allocator_get();
+  return_if_fail(allocator != NULL);
 
-  return tk_calloc_impl(nmemb, size);
-}
-
-void* tk_realloc(void* ptr, uint32_t size, const char* func, uint32_t line) {
-  (void)func;
-  (void)line;
-
-  return tk_realloc_impl(ptr, size);
-}
-
-void* tk_alloc(uint32_t size, const char* func, uint32_t line) {
-  (void)func;
-  (void)line;
-
-  return tk_alloc_impl(size);
-}
-
-void tk_free(void* ptr) {
-  if (ptr != NULL) {
-    tk_free_impl(ptr);
-  }
+  mem_allocator_free(allocator, ptr);
 }
 
 void tk_mem_dump(void) {
-  mem_stat_t s = tk_mem_stat();
-  log_debug("used: %d bytes %d blocks\n", s.used_bytes, s.used_block_nr);
-}
+  mem_allocator_t* allocator = mem_allocator_get();
+  return_if_fail(allocator != NULL);
 
-#endif /*ENABLE_MEM_LEAK_CHECK*/
+  mem_allocator_dump(allocator);
+}

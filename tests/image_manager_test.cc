@@ -45,8 +45,6 @@ TEST(ImageManager, add) {
 
   bmp.w = 10;
   bmp.h = 10;
-  bmp.data = NULL;
-  bmp.destroy = NULL;
 
   ASSERT_EQ(image_manager_add(image_manager(), "checked", &bmp), RET_OK);
   ASSERT_EQ(image_manager_lookup(image_manager(), "checked", &bmp), RET_OK);
@@ -56,7 +54,7 @@ TEST(ImageManager, add) {
 TEST(ImageManager, locale) {
   bitmap_t bmp;
   memset(&bmp, 0x00, sizeof(bmp));
-  image_manager_t* imm = image_manager_create(image_loader_stb());
+  image_manager_t* imm = image_manager_create();
   assets_manager_t* am = assets_manager_create(0);
 
   assets_manager_set_res_root(am, "tests/testdata");
@@ -78,3 +76,15 @@ TEST(ImageManager, locale) {
   assets_manager_destroy(am);
   image_manager_destroy(imm);
 }
+
+#ifdef WITH_FS_RES
+TEST(ImageManager, fs) {
+  bitmap_t bmp;
+  const char* filename = "file://./demos/assets/default/raw/images/xx/flag_CN.png";
+
+  memset(&bmp, 0x00, sizeof(bmp));
+  ASSERT_EQ(image_manager_get_bitmap(image_manager(), filename, &bmp), RET_OK);
+  ASSERT_EQ(image_manager_lookup(image_manager(), filename, &bmp), RET_OK);
+  ASSERT_EQ(image_manager_unload_bitmap(image_manager(), &bmp), RET_OK);
+}
+#endif /*WITH_FS_RES*/

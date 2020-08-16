@@ -3,7 +3,7 @@
  * Author: AWTK Develop Team
  * Brief:  image manager
  *
- * Copyright (c) 2018 - 2019  Guangzhou ZHIYUAN Electronics Co.,Ltd.
+ * Copyright (c) 2018 - 2020  Guangzhou ZHIYUAN Electronics Co.,Ltd.
  *
  * This program is distributed in the hope that it will be useful,
  * but WITHOUT ANY WARRANTY; without even the implied warranty of
@@ -44,7 +44,7 @@ typedef struct _bitmap_header_t {
  * @annotation ["scriptable"]
  * 图片管理器。负责加载，解码和缓存图片。
  */
-typedef struct _image_manager_t {
+struct _image_manager_t {
   /**
    * @property {darray_t} images
    * @annotation ["private"]
@@ -53,19 +53,12 @@ typedef struct _image_manager_t {
   darray_t images;
 
   /**
-   * @property {image_loader_t*} loader
-   * @annotation ["private"]
-   * 图片加载器。
-   */
-  image_loader_t* loader;
-
-  /**
    * @property {assets_manager_t*} assets_manager
    * @annotation ["private"]
    * 资源管理器。
    */
   assets_manager_t* assets_manager;
-} image_manager_t;
+};
 
 /**
  * @method image_manager
@@ -89,22 +82,20 @@ ret_t image_manager_set(image_manager_t* imm);
  * @method image_manager_create
  * 创建图片管理器。
  * @annotation ["constructor"]
- * @param {image_loader_t*} loader 图片加载器。
  *
  * @return {image_manager_t*} 返回图片管理器对象。
  */
-image_manager_t* image_manager_create(image_loader_t* loader);
+image_manager_t* image_manager_create(void);
 
 /**
  * @method image_manager_init
  * 初始化图片管理器。
  * @annotation ["constructor"]
  * @param {image_manager_t*} imm 图片管理器对象。
- * @param {image_loader_t*} loader 图片加载器。
  *
  * @return {image_manager_t*} 返回图片管理器对象。
  */
-image_manager_t* image_manager_init(image_manager_t* imm, image_loader_t* loader);
+image_manager_t* image_manager_init(image_manager_t* imm);
 
 /**
  * @method image_manager_get_bitmap
@@ -121,6 +112,17 @@ image_manager_t* image_manager_init(image_manager_t* imm, image_loader_t* loader
 ret_t image_manager_get_bitmap(image_manager_t* imm, const char* name, bitmap_t* image);
 
 /**
+ * @method image_manager_preload
+ * 预加载指定的图片。
+ * @annotation ["scriptable"]
+ * @param {image_manager_t*} imm 图片管理器对象。
+ * @param {char*} name 图片名称。
+ *
+ * @return {ret_t} 返回RET_OK表示成功，否则表示失败。
+ */
+ret_t image_manager_preload(image_manager_t* imm, const char* name);
+
+/**
  * @method image_manager_unload_unused
  * 从图片管理器中卸载指定时间内没有使用的图片。
  * @param {image_manager_t*} imm 图片管理器对象。
@@ -129,6 +131,16 @@ ret_t image_manager_get_bitmap(image_manager_t* imm, const char* name, bitmap_t*
  * @return {ret_t} 返回RET_OK表示成功，否则表示失败。
  */
 ret_t image_manager_unload_unused(image_manager_t* imm, uint32_t time_delta_s);
+
+/**
+ * @method image_manager_unload_all
+ * 从图片管理器中卸载全部图片。
+ *
+ * @param {image_manager_t*} imm 图片管理器对象。
+ *
+ * @return {ret_t} 返回RET_OK表示成功，否则表示失败。
+ */
+ret_t image_manager_unload_all(image_manager_t* imm);
 
 /**
  * @method image_manager_unload_bitmap

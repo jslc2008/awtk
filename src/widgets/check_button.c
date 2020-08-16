@@ -3,7 +3,7 @@
  * Author: AWTK Develop Team
  * Brief:  check_button
  *
- * Copyright (c) 2018 - 2019  Guangzhou ZHIYUAN Electronics Co.,Ltd.
+ * Copyright (c) 2018 - 2020  Guangzhou ZHIYUAN Electronics Co.,Ltd.
  *
  * This program is distributed in the hope that it will be useful,
  * but WITHOUT ANY WARRANTY; without even the implied warranty of
@@ -20,6 +20,7 @@
  */
 
 #include "tkc/mem.h"
+#include "tkc/utils.h"
 #include "widgets/check_button.h"
 #include "base/image_manager.h"
 #include "base/widget_vtable.h"
@@ -27,6 +28,7 @@
 static ret_t check_button_on_event(widget_t* widget, event_t* e) {
   uint16_t type = e->type;
   check_button_t* check_button = CHECK_BUTTON(widget);
+  return_value_if_fail(check_button != NULL, RET_BAD_PARAMS);
 
   switch (type) {
     case EVT_POINTER_DOWN: {
@@ -41,20 +43,19 @@ static ret_t check_button_on_event(widget_t* widget, event_t* e) {
       widget_set_state(widget, WIDGET_STATE_NORMAL);
       break;
     }
+    case EVT_CLICK: {
+      if (check_button->radio) {
+        check_button_set_value(widget, TRUE);
+      } else {
+        check_button_set_value(widget, !(check_button->value));
+      }
+      break;
+    }
     case EVT_POINTER_UP: {
       pointer_event_t* evt = (pointer_event_t*)e;
-
       if (check_button->pressed && widget_is_point_in(widget, evt->x, evt->y, FALSE)) {
-        pointer_event_t click = *evt;
-        click.e.type = EVT_CLICK;
-
-        if (check_button->radio) {
-          check_button_set_value(widget, TRUE);
-        } else {
-          check_button_set_value(widget, !(check_button->value));
-        }
-
-        widget_dispatch(widget, (event_t*)&click);
+        pointer_event_t click;
+        widget_dispatch(widget, pointer_event_init(&click, EVT_CLICK, widget, evt->x, evt->y));
       }
 
       check_button->pressed = FALSE;
@@ -90,7 +91,7 @@ static ret_t check_button_set_value_only(widget_t* widget, bool_t value) {
     e = event_init(EVT_VALUE_CHANGED, widget);
     widget_dispatch(widget, &e);
 
-    widget_update_style(widget);
+    widget_set_need_update_style(widget);
     widget_invalidate_force(widget, NULL);
   }
 
@@ -143,8 +144,11 @@ static ret_t check_button_set_prop(widget_t* widget, const char* name, const val
 
 static const char* s_check_button_properties[] = {WIDGET_PROP_VALUE, NULL};
 TK_DECL_VTABLE(check_button) = {
+    .inputable = TRUE,
     .size = sizeof(check_button_t),
     .type = WIDGET_TYPE_CHECK_BUTTON,
+    .space_key_to_activate = TRUE,
+    .return_key_to_activate = TRUE,
     .clone_properties = s_check_button_properties,
     .persistent_properties = s_check_button_properties,
     .parent = TK_PARENT_VTABLE(widget),
@@ -156,8 +160,11 @@ TK_DECL_VTABLE(check_button) = {
 };
 
 TK_DECL_VTABLE(radio_button) = {
+    .inputable = TRUE,
     .size = sizeof(check_button_t),
     .type = WIDGET_TYPE_RADIO_BUTTON,
+    .space_key_to_activate = TRUE,
+    .return_key_to_activate = TRUE,
     .clone_properties = s_check_button_properties,
     .parent = TK_PARENT_VTABLE(widget),
     .create = check_button_create_radio,
@@ -173,7 +180,6 @@ widget_t* check_button_create(widget_t* parent, xy_t x, xy_t y, wh_t w, wh_t h) 
   return_value_if_fail(check_button != NULL, NULL);
 
   check_button->radio = FALSE;
-  widget->state = WIDGET_STATE_NORMAL;
   check_button_set_value_only(widget, FALSE);
 
   return widget;
@@ -185,7 +191,6 @@ widget_t* check_button_create_radio(widget_t* parent, xy_t x, xy_t y, wh_t w, wh
   return_value_if_fail(check_button != NULL, NULL);
 
   check_button->radio = TRUE;
-  widget->state = WIDGET_STATE_NORMAL;
   check_button_set_value_only(widget, FALSE);
 
   return widget;
@@ -197,4 +202,24 @@ widget_t* check_button_cast(widget_t* widget) {
       NULL);
 
   return widget;
+}
+
+widget_t* check_button_get_checked_button(widget_t* widget) {
+  check_button_t* check_button = CHECK_BUTTON(widget);
+  return_value_if_fail(check_button != NULL, NULL);
+
+  if (check_button->radio && widget->parent != NULL) {
+    widget_t* parent = widget->parent;
+
+    WIDGET_FOR_EACH_CHILD_BEGIN(parent, iter, i)
+    if (iter->vt == widget->vt) {
+      check_button_t* b = CHECK_BUTTON(iter);
+      if (b->value) {
+        return iter;
+      }
+    }
+    WIDGET_FOR_EACH_CHILD_END();
+  }
+
+  return NULL;
 }

@@ -1,9 +1,9 @@
-/**
+﻿/**
  * File:   window_animator_slide_up.h
  * Author: AWTK Develop Team
  * Brief:  slide window animator
  *
- * Copyright (c) 2018 - 2019  Guangzhou ZHIYUAN Electronics Co.,Ltd.
+ * Copyright (c) 2018 - 2020  Guangzhou ZHIYUAN Electronics Co.,Ltd.
  *
  * This program is distributed in the hope that it will be useful,
  * but WITHOUT ANY WARRANTY; without even the implied warranty of
@@ -31,7 +31,7 @@ static ret_t window_animator_slide_draw_mask(window_animator_t* wa, uint8_t alph
     canvas_fill_rect(c, win->x, win->y, win->w, win->h);
   }
 
-  return alpha;
+  return RET_OK;
 }
 
 static ret_t on_prev_window_paint_done(void* ctx, event_t* e) {

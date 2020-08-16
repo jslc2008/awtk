@@ -3,7 +3,7 @@
  * Author: AWTK Develop Team
  * Brief:  locale_info
  *
- * Copyright (c) 2018 - 2019  Guangzhou ZHIYUAN Electronics Co.,Ltd.
+ * Copyright (c) 2018 - 2020  Guangzhou ZHIYUAN Electronics Co.,Ltd.
  *
  * This program is distributed in the hope that it will be useful,
  * but WITHOUT ANY WARRANTY; without even the implied warranty of
@@ -24,6 +24,7 @@
 
 #include "tkc/emitter.h"
 #include "base/events.h"
+#include "base/types_def.h"
 #include "base/assets_manager.h"
 
 BEGIN_C_DECLS
@@ -34,7 +35,7 @@ BEGIN_C_DECLS
  * 本地化信息。提供字符串翻译数据管理，当前语言改变的事件通知等等。
  *
  */
-typedef struct _locale_info_t {
+struct _locale_info_t {
   /**
    * @property {char*} country;
    * @annotation ["readable"]
@@ -57,7 +58,7 @@ typedef struct _locale_info_t {
   const asset_info_t* strs;
 
   emitter_t* emitter;
-} locale_info_t;
+};
 
 /**
  * @method locale_info
@@ -94,9 +95,9 @@ locale_info_t* locale_info_create(const char* language, const char* country);
  * 翻译字符串。
  * @annotation ["scriptable"]
  * @param {locale_info_t*} locale_info locale_info对象。
- * @param {char*} text 待翻译的文本。
+ * @param {const char*} text 待翻译的文本。
  *
- * @return {char*} 返回翻译之后的字符串。
+ * @return {const char*} 返回翻译之后的字符串。
  */
 const char* locale_info_tr(locale_info_t* locale_info, const char* text);
 
@@ -115,8 +116,7 @@ ret_t locale_info_change(locale_info_t* locale_info, const char* language, const
 /**
  * @method locale_info_on
  * 注册指定事件的处理函数。
- * @annotation ["scriptable:custom"]
- * @param {locale_info_t*} locale_info 控件对象。
+ * @param {locale_info_t*} locale_info locale_info对象。
  * @param {event_type_t} type 事件类型，目前固定为EVT_LOCALE_CHANGED。
  * @param {event_func_t} on_event 事件处理函数。
  * @param {void*} ctx 事件处理函数上下文。
@@ -130,7 +130,7 @@ uint32_t locale_info_on(locale_info_t* locale_info, event_type_t type, event_fun
  * @method locale_info_off
  * 注销指定事件的处理函数。
  * @annotation ["scriptable"]
- * @param {locale_info_t*} locale_info 控件对象。
+ * @param {locale_info_t*} locale_info locale_info对象。
  * @param {uint32_t} id locale_info_on返回的ID。
  *
  * @return {ret_t} 返回RET_OK表示成功，否则表示失败。
@@ -141,12 +141,22 @@ ret_t locale_info_off(locale_info_t* locale_info, uint32_t id);
  * @method locale_info_set_assets_manager
  * 设置资源管理器对象。
  *
- * @param {locale_info_t*} locale_info 图片管理器对象。
+ * @param {locale_info_t*} locale_info locale_info对象。
  * @param {assets_manager_t*} assets_manager 资源管理器。
  *
  * @return {ret_t} 返回RET_OK表示成功，否则表示失败。
  */
 ret_t locale_info_set_assets_manager(locale_info_t* locale_info, assets_manager_t* assets_manager);
+
+/**
+ * @method locale_info_reload
+ * 重新加载字符串资源。
+ *
+ * @param {locale_info_t*} locale_info locale_info对象。
+ *
+ * @return {ret_t} 返回RET_OK表示成功，否则表示失败。
+ */
+ret_t locale_info_reload(locale_info_t* locale_info);
 
 /**
  * @method locale_info_destroy

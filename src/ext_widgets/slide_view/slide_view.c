@@ -3,7 +3,7 @@
  * Author: AWTK Develop Team
  * Brief:  slide_view
  *
- * Copyright (c) 2018 - 2019  Guangzhou ZHIYUAN Electronics Co.,Ltd.
+ * Copyright (c) 2018 - 2020  Guangzhou ZHIYUAN Electronics Co.,Ltd.
  *
  * This program is distributed in the hope that it will be useful,
  * but WITHOUT ANY WARRANTY; without even the implied warranty of
@@ -26,8 +26,6 @@
 #include "slide_view/slide_view.h"
 #include "widget_animators/widget_animator_scroll.h"
 
-static ret_t slide_view_invalidate(slide_view_t* slide_view);
-
 static bool_t anim_hint_is_overlap(slide_view_t* slide_view) {
   return tk_str_eq(slide_view->anim_hint, "overlap") ||
          tk_str_eq(slide_view->anim_hint, "overlap_with_alpha");
@@ -41,12 +39,16 @@ static bool_t slide_view_is_loopable(slide_view_t* slide_view) {
   return slide_view->auto_play || slide_view->loop;
 }
 
-static ret_t canvas_set_clip_rect_with_offset(canvas_t* c, rect_t* r, int32_t ox, int32_t oy) {
+static ret_t canvas_set_clip_rect_with_offset(canvas_t* c, rect_t* r, rect_t* save_r, int32_t ox,
+                                              int32_t oy) {
   rect_t rr = *r;
-
+  vgcanvas_t* vg = canvas_get_vgcanvas(c);
   rr.x += ox;
   rr.y += oy;
 
+  rr = rect_intersect(&rr, save_r);
+
+  vgcanvas_clip_rect(vg, rr.x, rr.y, rr.w, rr.h);
   return canvas_set_clip_rect(c, &rr);
 }
 
@@ -126,6 +128,7 @@ static ret_t slide_view_on_pointer_down(slide_view_t* slide_view, pointer_event_
 static ret_t slide_view_on_scroll_done(void* ctx, event_t* e) {
   widget_t* widget = WIDGET(ctx);
   slide_view_t* slide_view = SLIDE_VIEW(ctx);
+  return_value_if_fail(widget != NULL && slide_view != NULL, RET_BAD_PARAMS);
 
   if (slide_view->xoffset > 0 || slide_view->yoffset > 0) {
     slide_view_activate_prev(slide_view);
@@ -218,8 +221,10 @@ static ret_t slide_view_on_pointer_move(slide_view_t* slide_view, pointer_event_
 }
 
 static ret_t slide_view_on_event(widget_t* widget, event_t* e) {
+  ret_t ret = RET_OK;
   uint16_t type = e->type;
   slide_view_t* slide_view = SLIDE_VIEW(widget);
+  return_value_if_fail(widget != NULL && slide_view != NULL, RET_BAD_PARAMS);
 
   if (slide_view->animating) {
     return RET_OK;
@@ -227,23 +232,37 @@ static ret_t slide_view_on_event(widget_t* widget, event_t* e) {
 
   switch (type) {
     case EVT_POINTER_DOWN:
+      slide_view->pressed = TRUE;
       widget_grab(widget->parent, widget);
       slide_view_on_pointer_down(slide_view, (pointer_event_t*)e);
       break;
     case EVT_POINTER_UP: {
-      if (slide_view->dragged) {
-        slide_view_on_pointer_up(slide_view, (pointer_event_t*)e);
+      if (slide_view->pressed) {
+        if (slide_view->dragged) {
+          slide_view_on_pointer_up(slide_view, (pointer_event_t*)e);
+        }
+        slide_view->dragged = FALSE;
+        slide_view->pressed = FALSE;
+        widget_ungrab(widget->parent, widget);
       }
-      slide_view->dragged = FALSE;
-      widget_ungrab(widget->parent, widget);
+      break;
+    }
+    case EVT_POINTER_DOWN_ABORT: {
+      if (slide_view->pressed) {
+        slide_view->xoffset = 0;
+        slide_view->yoffset = 0;
+        slide_view->pressed = FALSE;
+        slide_view->dragged = FALSE;
+        widget_ungrab(widget->parent, widget);
+      }
       break;
     }
     case EVT_POINTER_MOVE: {
       pointer_event_t* evt = (pointer_event_t*)e;
       if (slide_view->dragged) {
         slide_view_on_pointer_move(slide_view, evt);
-        slide_view_invalidate(slide_view);
-      } else if (evt->pressed) {
+        widget_invalidate(widget, NULL);
+      } else if (evt->pressed && slide_view->pressed) {
         int32_t delta = 0;
 
         if (slide_view->vertical) {
@@ -252,26 +271,43 @@ static ret_t slide_view_on_event(widget_t* widget, event_t* e) {
           delta = evt->x - slide_view->down.x;
         }
 
-        if (tk_abs(delta) >= TK_DRAG_THRESHOLD) {
-          pointer_event_t abort = *evt;
-          abort.e.type = EVT_POINTER_DOWN_ABORT;
-
-          widget_dispatch_event_to_target_recursive(widget->target, (event_t*)(&abort));
+        if (tk_abs(delta) > TK_DRAG_THRESHOLD) {
+          pointer_event_t abort;
+          pointer_event_init(&abort, EVT_POINTER_DOWN_ABORT, widget, evt->x, evt->y);
+          widget_dispatch_event_to_target_recursive(widget, (event_t*)(&abort));
           slide_view->dragged = TRUE;
         }
       }
 
       break;
     }
+    case EVT_KEY_UP: {
+      key_event_t* evt = (key_event_t*)e;
+      if (evt->key == TK_KEY_LEFT) {
+        ret = RET_STOP;
+        slide_view_activate_prev(slide_view);
+      } else if (evt->key == TK_KEY_RIGHT) {
+        ret = RET_STOP;
+        slide_view_activate_next(slide_view);
+      }
+    }
     default:
       break;
   }
 
-  return RET_OK;
+  if (ret == RET_OK) {
+    if (slide_view->dragged) {
+      ret = RET_STOP;
+    }
+  }
+
+  return ret;
 }
 
 static widget_t* slide_view_find_target(widget_t* widget, xy_t x, xy_t y) {
   slide_view_t* slide_view = SLIDE_VIEW(widget);
+  return_value_if_fail(widget != NULL && slide_view != NULL, NULL);
+
   if (slide_view->xoffset || slide_view->yoffset) {
     return NULL;
   }
@@ -309,104 +345,6 @@ static ret_t slide_view_get_prop(widget_t* widget, const char* name, value_t* v)
   return RET_NOT_FOUND;
 }
 
-static ret_t widget_calc_children_rect(widget_t* widget, rect_t* r) {
-  uint32_t i = 0;
-  uint32_t nr = widget != NULL ? widget_count_children(widget) : 0;
-
-  memset(r, 0x0, sizeof(rect_t));
-
-  for (i = 0; i < nr; i++) {
-    rect_t rc;
-    widget_t* iter = widget_get_child(widget, i);
-    rc = rect_init(iter->x, iter->y, iter->w, iter->h);
-    rect_merge(r, &rc);
-  }
-
-  return RET_OK;
-}
-
-static ret_t slide_view_calc_dirty_rect(slide_view_t* slide_view, rect_t* r) {
-  rect_t r_next;
-  rect_t r_prev;
-  rect_t r_active;
-  int32_t xoffset = slide_view->xoffset;
-  int32_t yoffset = slide_view->yoffset;
-  widget_t* widget = WIDGET(slide_view);
-  widget_t* active = widget_get_child(widget, slide_view->active);
-  widget_t* next = slide_view_get_next(slide_view);
-  widget_t* prev = slide_view_get_prev(slide_view);
-
-  memset(r, 0x00, sizeof(rect_t));
-  widget_calc_children_rect(active, &r_active);
-  widget_calc_children_rect(next, &r_next);
-  widget_calc_children_rect(prev, &r_prev);
-
-  if (xoffset == 0 && yoffset == 0) {
-    *r = r_active;
-  } else if (xoffset) {
-    /*FIXME: optimize*/
-    r_active.x = 0;
-    r_active.w = widget->w;
-
-    rect_merge(r, &r_active);
-    if (xoffset < 0) {
-      if (next) {
-        r_next.x = 0;
-        r_next.w = widget->w;
-        rect_merge(r, &r_next);
-      }
-    } else {
-      if (prev) {
-        r_prev.x = 0;
-        r_prev.w = widget->w;
-        rect_merge(r, &r_prev);
-      }
-    }
-  } else if (yoffset) {
-    r_active.y = 0;
-    r_active.h = widget->h;
-
-    rect_merge(r, &r_active);
-    rect_merge(r, &r_next);
-  }
-
-  return RET_OK;
-}
-
-static ret_t slide_view_invalidate(slide_view_t* slide_view) {
-  rect_t r;
-  widget_t* widget = WIDGET(slide_view);
-  slide_view_calc_dirty_rect(slide_view, &r);
-
-  if (r.x < 0) {
-    r.x = 0;
-  }
-
-  if (r.x >= widget->w) {
-    r.x = 0;
-    r.w = 0;
-  }
-
-  if (r.y < 0) {
-    r.y = 0;
-  }
-
-  if (r.y >= widget->h) {
-    r.y = 0;
-    r.h = 0;
-  }
-
-  if ((r.x + r.w) > widget->w) {
-    r.w = widget->w - r.x;
-  }
-
-  if ((r.y + r.h) > widget->h) {
-    r.h = widget->h - r.y;
-  }
-
-  return widget_invalidate(widget, &r);
-}
-
 static ret_t slide_view_set_prop(widget_t* widget, const char* name, const value_t* v) {
   slide_view_t* slide_view = SLIDE_VIEW(widget);
   return_value_if_fail(widget != NULL && name != NULL && v != NULL, RET_BAD_PARAMS);
@@ -421,13 +359,13 @@ static ret_t slide_view_set_prop(widget_t* widget, const char* name, const value
     return slide_view_set_loop(widget, value_bool(v));
   } else if (tk_str_eq(name, WIDGET_PROP_XOFFSET)) {
     slide_view->xoffset = value_int(v);
-    slide_view_invalidate(slide_view);
+    widget_invalidate(widget, NULL);
     return RET_OK;
   } else if (tk_str_eq(name, WIDGET_PROP_AUTO_PLAY)) {
     return slide_view_set_auto_play(widget, value_int(v));
   } else if (tk_str_eq(name, WIDGET_PROP_YOFFSET)) {
     slide_view->yoffset = value_int(v);
-    slide_view_invalidate(slide_view);
+    widget_invalidate(widget, NULL);
     return RET_OK;
   }
 
@@ -435,35 +373,54 @@ static ret_t slide_view_set_prop(widget_t* widget, const char* name, const value
 }
 
 static ret_t slide_view_paint_prev_next_v_translate(slide_view_t* slide_view, canvas_t* c,
-                                                    widget_t* prev, widget_t* next,
+                                                    rect_t* save_r, widget_t* prev, widget_t* next,
                                                     int32_t yoffset) {
+  rect_t r;
   int32_t ox = c->ox;
   int32_t oy = c->oy;
   xy_t w = WIDGET(slide_view)->w;
   xy_t h = WIDGET(slide_view)->h;
   int32_t r_yoffset = h - yoffset;
 
-  if (prev) {
-    rect_t r = rect_init(0, 0, w, yoffset);
-    canvas_translate(c, 0, -r_yoffset);
-    canvas_set_clip_rect_with_offset(c, &r, ox, oy);
-    widget_paint(prev, c);
-    canvas_untranslate(c, 0, -r_yoffset);
+  if (prev != NULL) {
+    if (yoffset > h) {
+      r = rect_init(0, yoffset - h, w, h + h - yoffset);
+    } else {
+      r = rect_init(0, 0, w, yoffset);
+    }
+
+    if (r.h > 0) {
+      canvas_save(c);
+      canvas_translate(c, 0, -r_yoffset);
+      canvas_set_clip_rect_with_offset(c, &r, save_r, ox, oy);
+      widget_paint(prev, c);
+      canvas_untranslate(c, 0, -r_yoffset);
+      canvas_restore(c);
+    }
   }
 
   if (next != NULL) {
-    canvas_translate(c, 0, yoffset);
-    rect_t r = rect_init(0, yoffset, w, r_yoffset);
-    canvas_set_clip_rect_with_offset(c, &r, ox, oy);
-    widget_paint(next, c);
-    canvas_untranslate(c, 0, yoffset);
+    if (r_yoffset > h) {
+      r = rect_init(0, 0, w, h + h - r_yoffset);
+    } else {
+      r = rect_init(0, yoffset, w, r_yoffset);
+    }
+
+    if (r.h > 0) {
+      canvas_save(c);
+      canvas_translate(c, 0, yoffset);
+      canvas_set_clip_rect_with_offset(c, &r, save_r, ox, oy);
+      widget_paint(next, c);
+      canvas_untranslate(c, 0, yoffset);
+      canvas_restore(c);
+    }
   }
 
   return RET_OK;
 }
 
-static ret_t slide_view_set_next_global_alpha_v(slide_view_t* slide_view, canvas_t* c,
-                                                int32_t offset, int32_t total) {
+static ret_t slide_view_set_global_alpha(slide_view_t* slide_view, canvas_t* c, int32_t offset,
+                                         int32_t total) {
   if (anim_hint_is_overlap_with_alpha(slide_view)) {
     uint8_t a = 0xff - (0xff * offset) / total;
     canvas_set_global_alpha(c, a);
@@ -473,7 +430,8 @@ static ret_t slide_view_set_next_global_alpha_v(slide_view_t* slide_view, canvas
 }
 
 static ret_t slide_view_paint_prev_next_v_overlap(slide_view_t* slide_view, canvas_t* c,
-                                                  widget_t* prev, widget_t* next, int32_t yoffset) {
+                                                  rect_t* save_r, widget_t* prev, widget_t* next,
+                                                  int32_t yoffset) {
   rect_t r;
   int32_t ox = c->ox;
   int32_t oy = c->oy;
@@ -481,49 +439,65 @@ static ret_t slide_view_paint_prev_next_v_overlap(slide_view_t* slide_view, canv
   xy_t h = WIDGET(slide_view)->h;
   int32_t r_yoffset = h - yoffset;
 
-  if (next != NULL) {
-    slide_view_set_next_global_alpha_v(slide_view, c, yoffset, h);
-    widget_paint(next, c);
-    canvas_set_global_alpha(c, 0xff);
+  if (next != NULL && r_yoffset >= 0) {
+    canvas_save(c);
+    if (r_yoffset > h) {
+      widget_paint(next, c);
+    } else {
+      slide_view_set_global_alpha(slide_view, c, yoffset, h);
+      widget_paint(next, c);
+      canvas_set_global_alpha(c, 0xff);
+    }
+    canvas_restore(c);
   }
 
-  r = rect_init(0, 0, w, yoffset);
   if (prev != NULL) {
-    canvas_translate(c, 0, -r_yoffset);
-    canvas_set_clip_rect_with_offset(c, &r, ox, oy);
-    widget_paint(prev, c);
-    canvas_untranslate(c, 0, -r_yoffset);
+    if (yoffset > h) {
+      r_yoffset = 0;
+      yoffset = h;
+    }
+
+    r = rect_init(0, 0, w, yoffset);
+
+    if (r.h > 0) {
+      canvas_save(c);
+      canvas_translate(c, 0, -r_yoffset);
+      canvas_set_clip_rect_with_offset(c, &r, save_r, ox, oy);
+      widget_paint(prev, c);
+      canvas_untranslate(c, 0, -r_yoffset);
+      canvas_restore(c);
+    }
   }
 
   return RET_OK;
 }
 
-static ret_t slide_view_paint_children_v_gt(slide_view_t* slide_view, canvas_t* c) {
+static ret_t slide_view_paint_children_v_gt(slide_view_t* slide_view, canvas_t* c, rect_t* save_r) {
   int32_t yoffset = tk_abs(slide_view->yoffset);
   widget_t* prev = slide_view_get_prev(slide_view);
   widget_t* active = widget_get_child(WIDGET(slide_view), slide_view->active);
 
   if (anim_hint_is_overlap(slide_view)) {
-    return slide_view_paint_prev_next_v_overlap(slide_view, c, prev, active, yoffset);
+    return slide_view_paint_prev_next_v_overlap(slide_view, c, save_r, prev, active, yoffset);
   } else {
-    return slide_view_paint_prev_next_v_translate(slide_view, c, prev, active, yoffset);
+    return slide_view_paint_prev_next_v_translate(slide_view, c, save_r, prev, active, yoffset);
   }
 }
 
-static ret_t slide_view_paint_children_v_lt(slide_view_t* slide_view, canvas_t* c) {
+static ret_t slide_view_paint_children_v_lt(slide_view_t* slide_view, canvas_t* c, rect_t* save_r) {
   int32_t yoffset = WIDGET(slide_view)->h - tk_abs(slide_view->yoffset);
   widget_t* next = slide_view_get_next(slide_view);
   widget_t* active = widget_get_child(WIDGET(slide_view), slide_view->active);
 
   if (anim_hint_is_overlap(slide_view)) {
-    return slide_view_paint_prev_next_v_overlap(slide_view, c, active, next, yoffset);
+    return slide_view_paint_prev_next_v_overlap(slide_view, c, save_r, active, next, yoffset);
   } else {
-    return slide_view_paint_prev_next_v_translate(slide_view, c, active, next, yoffset);
+    return slide_view_paint_prev_next_v_translate(slide_view, c, save_r, active, next, yoffset);
   }
 }
 
 static ret_t slide_view_paint_prev_next_h_translate(slide_view_t* slide_view, canvas_t* c,
-                                                    widget_t* prev, widget_t* next,
+                                                    rect_t* save_r, widget_t* prev, widget_t* next,
                                                     int32_t xoffset) {
   rect_t r;
   int32_t ox = c->ox;
@@ -532,45 +506,46 @@ static ret_t slide_view_paint_prev_next_h_translate(slide_view_t* slide_view, ca
   xy_t h = WIDGET(slide_view)->h;
   int32_t r_xoffset = w - xoffset;
 
-  r = rect_init(0, 0, xoffset, h);
   if (prev != NULL) {
-    canvas_translate(c, -r_xoffset, 0);
-    canvas_set_clip_rect_with_offset(c, &r, ox, oy);
-    widget_paint(prev, c);
-    canvas_untranslate(c, -r_xoffset, 0);
+    if (xoffset > w) {
+      r = rect_init(xoffset - w, 0, w + w - xoffset, h);
+    } else {
+      r = rect_init(0, 0, xoffset, h);
+    }
+
+    if (r.w > 0) {
+      canvas_save(c);
+      canvas_translate(c, -r_xoffset, 0);
+      canvas_set_clip_rect_with_offset(c, &r, save_r, ox, oy);
+      widget_paint(prev, c);
+      canvas_untranslate(c, -r_xoffset, 0);
+      canvas_restore(c);
+    }
   }
 
   if (next != NULL) {
-    canvas_translate(c, xoffset, 0);
-    r = rect_init(xoffset, 0, r_xoffset, h);
-    canvas_set_clip_rect_with_offset(c, &r, ox, oy);
-    widget_paint(next, c);
-    canvas_untranslate(c, xoffset, 0);
-  }
-
-  return RET_OK;
-}
-
-static ret_t slide_view_set_prev_global_alpha_h(slide_view_t* slide_view, canvas_t* c) {
-  if (anim_hint_is_overlap_with_alpha(slide_view)) {
-    uint8_t a = 0;
-    int32_t offset = slide_view->xoffset;
-    int32_t total = WIDGET(slide_view)->w;
-
-    if (offset > 0) {
-      a = (0xff * tk_abs(offset)) / total;
+    if (r_xoffset > w) {
+      r = rect_init(0, 0, w + w - r_xoffset, h);
     } else {
-      a = 0xff - (0xff * tk_abs(offset)) / total;
+      r = rect_init(xoffset, 0, r_xoffset, h);
     }
 
-    canvas_set_global_alpha(c, a);
+    if (r.w > 0) {
+      canvas_save(c);
+      canvas_translate(c, xoffset, 0);
+      canvas_set_clip_rect_with_offset(c, &r, save_r, ox, oy);
+      widget_paint(next, c);
+      canvas_untranslate(c, xoffset, 0);
+      canvas_restore(c);
+    }
   }
 
   return RET_OK;
 }
 
 static ret_t slide_view_paint_prev_next_h_overlap(slide_view_t* slide_view, canvas_t* c,
-                                                  widget_t* prev, widget_t* next, int32_t xoffset) {
+                                                  rect_t* save_r, widget_t* prev, widget_t* next,
+                                                  int32_t xoffset) {
   rect_t r;
   int32_t ox = c->ox;
   int32_t oy = c->oy;
@@ -578,152 +553,105 @@ static ret_t slide_view_paint_prev_next_h_overlap(slide_view_t* slide_view, canv
   xy_t h = WIDGET(slide_view)->h;
   int32_t r_xoffset = w - xoffset;
 
-  r = rect_init(0, 0, xoffset, h);
-  if (prev != NULL) {
-    slide_view_set_prev_global_alpha_h(slide_view, c);
-    widget_paint(prev, c);
-    canvas_set_global_alpha(c, 0xff);
+  if (prev != NULL && xoffset >= 0) {
+    canvas_save(c);
+    if (xoffset > w) {
+      widget_paint(prev, c);
+    } else {
+      slide_view_set_global_alpha(slide_view, c, r_xoffset, w);
+      widget_paint(prev, c);
+      canvas_set_global_alpha(c, 0xff);
+    }
+    canvas_restore(c);
   }
 
   if (next != NULL) {
-    canvas_translate(c, xoffset, 0);
+    if (r_xoffset > w) {
+      xoffset = 0;
+      r_xoffset = w;
+    }
+
     r = rect_init(xoffset, 0, r_xoffset, h);
-    canvas_set_clip_rect_with_offset(c, &r, ox, oy);
-    widget_paint(next, c);
-    canvas_untranslate(c, xoffset, 0);
+
+    if (r.w > 0) {
+      canvas_save(c);
+      canvas_translate(c, xoffset, 0);
+      canvas_set_clip_rect_with_offset(c, &r, save_r, ox, oy);
+      widget_paint(next, c);
+      canvas_untranslate(c, xoffset, 0);
+      canvas_restore(c);
+    }
   }
 
   return RET_OK;
 }
 
-static ret_t slide_view_paint_children_h_gt(slide_view_t* slide_view, canvas_t* c) {
+static ret_t slide_view_paint_children_h_gt(slide_view_t* slide_view, canvas_t* c, rect_t* save_r) {
   int32_t xoffset = tk_abs(slide_view->xoffset);
   widget_t* prev = slide_view_get_prev(slide_view);
   widget_t* active = widget_get_child(WIDGET(slide_view), slide_view->active);
 
   if (anim_hint_is_overlap(slide_view)) {
-    return slide_view_paint_prev_next_h_overlap(slide_view, c, prev, active, xoffset);
+    return slide_view_paint_prev_next_h_overlap(slide_view, c, save_r, prev, active, xoffset);
   } else {
-    return slide_view_paint_prev_next_h_translate(slide_view, c, prev, active, xoffset);
+    return slide_view_paint_prev_next_h_translate(slide_view, c, save_r, prev, active, xoffset);
   }
 }
 
-static ret_t slide_view_paint_children_h_lt(slide_view_t* slide_view, canvas_t* c) {
+static ret_t slide_view_paint_children_h_lt(slide_view_t* slide_view, canvas_t* c, rect_t* save_r) {
   int32_t xoffset = WIDGET(slide_view)->w - tk_abs(slide_view->xoffset);
   widget_t* next = slide_view_get_next(slide_view);
   widget_t* active = widget_get_child(WIDGET(slide_view), slide_view->active);
 
   if (anim_hint_is_overlap(slide_view)) {
-    return slide_view_paint_prev_next_h_overlap(slide_view, c, active, next, xoffset);
+    return slide_view_paint_prev_next_h_overlap(slide_view, c, save_r, active, next, xoffset);
   } else {
-    return slide_view_paint_prev_next_h_translate(slide_view, c, active, next, xoffset);
+    return slide_view_paint_prev_next_h_translate(slide_view, c, save_r, active, next, xoffset);
   }
-}
-
-static ret_t slide_view_paint_indicator_one(widget_t* widget, canvas_t* c, rect_t* r,
-                                            uint32_t index, bool_t is_active) {
-  bitmap_t img;
-  style_t* style = widget->astyle;
-  color_t trans = color_init(0, 0, 0, 0);
-  color_t fg = style_get_color(style, STYLE_ID_FG_COLOR, trans);
-  const char* icon = style_get_str(style, STYLE_ID_ICON, NULL);
-  const char* active_icon = style_get_str(style, STYLE_ID_ACTIVE_ICON, NULL);
-
-  if (is_active) {
-    if (active_icon && widget_load_image(widget, active_icon, &img) == RET_OK) {
-      int32_t x = r->x + (r->w >> 1);
-      int32_t y = r->y + (r->h >> 1);
-      canvas_draw_icon(c, &img, x, y);
-    } else if (fg.rgba.a) {
-      canvas_set_fill_color(c, fg);
-      canvas_fill_rect(c, r->x, r->y, r->w, r->h);
-    }
-  } else {
-    if (icon && widget_load_image(widget, icon, &img) == RET_OK) {
-      int32_t x = r->x + (r->w >> 1);
-      int32_t y = r->y + (r->h >> 1);
-      canvas_draw_icon(c, &img, x, y);
-    } else if (fg.rgba.a) {
-      canvas_set_stroke_color(c, fg);
-      canvas_stroke_rect(c, r->x, r->y, r->w, r->h);
-    }
-  }
-
-  return RET_OK;
-}
-
-static ret_t slide_view_paint_indicator(widget_t* widget, canvas_t* c) {
-  rect_t r;
-  uint32_t i = 0;
-  uint32_t size = 8;
-  uint32_t offset = 0;
-  int32_t cx = widget->w >> 1;
-  int32_t cy = widget->h >> 1;
-  uint32_t half_size = size >> 1;
-  uint32_t double_size = size << 1;
-  uint32_t nr = widget_count_children(widget);
-  slide_view_t* slide_view = SLIDE_VIEW(widget);
-
-  if (nr % 2) {
-    offset = ((nr / 2) * double_size + half_size);
-  } else {
-    offset = ((nr / 2 - 1) * double_size + half_size);
-  }
-
-  if (slide_view->vertical) {
-    r = rect_init(tk_max(10, widget->w * 0.1), cy - offset, size, size);
-  } else {
-    r = rect_init(cx - offset, tk_min(widget->h - double_size, widget->h * 0.9), size, size);
-  }
-
-  for (i = 0; i < nr; i++) {
-    slide_view_paint_indicator_one(widget, c, &r, i, i == slide_view->active);
-    if (slide_view->vertical) {
-      r.y += double_size;
-    } else {
-      r.x += double_size;
-    }
-  }
-
-  return RET_OK;
 }
 
 static ret_t slide_view_on_paint_children(widget_t* widget, canvas_t* c) {
   rect_t save_r;
+  widget_t* active = NULL;
   uint8_t save_a = c->lcd->global_alpha;
+  vgcanvas_t* vg = canvas_get_vgcanvas(c);
   slide_view_t* slide_view = SLIDE_VIEW(widget);
-  widget_t* active = widget_get_child(widget, slide_view->active);
+  return_value_if_fail(widget != NULL && slide_view != NULL, RET_BAD_PARAMS);
 
+  active = widget_get_child(widget, slide_view->active);
   return_value_if_fail(active != NULL, RET_BAD_PARAMS);
 
   canvas_get_clip_rect(c, &save_r);
 
   if (slide_view->vertical) {
     if (slide_view->yoffset > 0) {
-      slide_view_paint_children_v_gt(slide_view, c);
+      slide_view_paint_children_v_gt(slide_view, c, &save_r);
     } else if (slide_view->yoffset < 0) {
-      slide_view_paint_children_v_lt(slide_view, c);
+      slide_view_paint_children_v_lt(slide_view, c, &save_r);
     } else {
       widget_paint(active, c);
     }
   } else {
     if (slide_view->xoffset > 0) {
-      slide_view_paint_children_h_gt(slide_view, c);
+      slide_view_paint_children_h_gt(slide_view, c, &save_r);
     } else if (slide_view->xoffset < 0) {
-      slide_view_paint_children_h_lt(slide_view, c);
+      slide_view_paint_children_h_lt(slide_view, c, &save_r);
     } else {
       widget_paint(active, c);
     }
   }
+
+  vgcanvas_clip_rect(vg, save_r.x, save_r.y, save_r.w, save_r.h);
   canvas_set_clip_rect(c, &save_r);
   canvas_set_global_alpha(c, save_a);
-  slide_view_paint_indicator(widget, c);
 
   return RET_OK;
 }
 
 static ret_t slide_view_on_destroy(widget_t* widget) {
   slide_view_t* slide_view = SLIDE_VIEW(widget);
+  return_value_if_fail(widget != NULL && slide_view != NULL, RET_BAD_PARAMS);
+
   if (slide_view->timer_id) {
     timer_remove(slide_view->timer_id);
     slide_view->timer_id = 0;
@@ -737,7 +665,9 @@ static const char* s_slide_view_properties[] = {WIDGET_PROP_VALUE,     WIDGET_PR
                                                 WIDGET_PROP_VERTICAL,  WIDGET_PROP_ANIM_HINT,
                                                 WIDGET_PROP_AUTO_PLAY, NULL};
 TK_DECL_VTABLE(slide_view) = {.size = sizeof(slide_view_t),
+                              .inputable = TRUE,
                               .type = WIDGET_TYPE_SLIDE_VIEW,
+                              .only_active_child_visible = TRUE,
                               .clone_properties = s_slide_view_properties,
                               .persistent_properties = s_slide_view_properties,
                               .parent = TK_PARENT_VTABLE(widget),
@@ -750,17 +680,89 @@ TK_DECL_VTABLE(slide_view) = {.size = sizeof(slide_view_t),
                               .on_paint_self = slide_view_on_paint_self,
                               .on_destroy = slide_view_on_destroy};
 
+static ret_t slide_view_on_target_destroy(void* ctx, event_t* evt) {
+  widget_t* view = WIDGET(ctx);
+
+  widget_set_prop_pointer(view, "save_target", NULL);
+
+  return RET_REMOVE;
+}
+
+static ret_t slide_view_save_target(widget_t* widget) {
+  widget_t* target = NULL;
+  slide_view_t* slide_view = SLIDE_VIEW(widget);
+  widget_t* active_view = widget_get_child(widget, slide_view->active);
+
+  if (active_view != NULL) {
+    target = active_view;
+    while (target->target != NULL) {
+      target = target->target;
+    }
+
+    if (target != NULL) {
+      widget_set_prop_pointer(active_view, "save_target", target);
+      widget_on(target, EVT_DESTROY, slide_view_on_target_destroy, active_view);
+    }
+  }
+
+  return RET_OK;
+}
+
+static ret_t slide_view_restore_target(widget_t* widget) {
+  widget_t* target = NULL;
+  slide_view_t* slide_view = SLIDE_VIEW(widget);
+  widget_t* active_view = widget_get_child(widget, slide_view->active);
+
+  if (active_view != NULL) {
+    target = WIDGET(widget_get_prop_pointer(active_view, "save_target"));
+
+    if (target == NULL || target->parent == NULL) {
+      const char* default_focused_child =
+          widget_get_prop_str(active_view, "default_focused_child", NULL);
+      if (default_focused_child != NULL) {
+        target = widget_lookup(active_view, default_focused_child, TRUE);
+        if (target == NULL) {
+          target = widget_lookup_by_type(active_view, default_focused_child, TRUE);
+        }
+      }
+    }
+
+    if (target == NULL || target->parent == NULL) {
+      target = active_view;
+    }
+    widget_off_by_func(target, EVT_DESTROY, slide_view_on_target_destroy, active_view);
+
+    log_debug("target=%s\n", target->vt->type);
+    while (target->parent != NULL) {
+      target->parent->target = target;
+      target->parent->key_target = target;
+      target = target->parent;
+      if (target == widget) {
+        break;
+      }
+    }
+  }
+
+  return RET_OK;
+}
+
 ret_t slide_view_set_active(widget_t* widget, uint32_t active) {
   slide_view_t* slide_view = SLIDE_VIEW(widget);
   return_value_if_fail(slide_view != NULL, RET_BAD_PARAMS);
 
-  if (slide_view->active != active) {
+  if (slide_view->active != active && widget->children != NULL) {
     event_t evt = event_init(EVT_VALUE_WILL_CHANGE, widget);
+
+    slide_view_save_target(widget);
     widget_dispatch(widget, &evt);
     slide_view->active = active;
     evt = event_init(EVT_VALUE_CHANGED, widget);
     widget_dispatch(widget, &evt);
+    slide_view_restore_target(widget);
+
     widget_invalidate(widget, NULL);
+  } else {
+    slide_view->active = active;
   }
 
   return RET_OK;
@@ -809,6 +811,7 @@ widget_t* slide_view_create(widget_t* parent, xy_t x, xy_t y, wh_t w, wh_t h) {
 static ret_t slide_view_on_timer_next(const timer_info_t* timer) {
   widget_t* widget = WIDGET(timer->ctx);
   slide_view_t* slide_view = SLIDE_VIEW(timer->ctx);
+  return_value_if_fail(slide_view != NULL, RET_BAD_PARAMS);
 
   widget_animator_t* animator =
       widget_animator_scroll_create(widget, TK_ANIMATING_TIME, 0, EASING_SIN_INOUT);

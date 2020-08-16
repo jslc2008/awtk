@@ -1,4 +1,4 @@
-﻿#include "widgets/window.h"
+﻿#include "base/window.h"
 #include "base/canvas.h"
 #include "base/widget.h"
 #include "font_dummy.h"
@@ -41,6 +41,18 @@ TEST(Window, basic) {
   ASSERT_EQ(widget_set_prop(w, WIDGET_PROP_THEME, &v1), RET_OK);
   ASSERT_EQ(widget_get_prop(w, WIDGET_PROP_THEME, &v2), RET_OK);
   ASSERT_EQ(strcmp(value_str(&v2), value_str(&v1)), 0);
+
+  widget_destroy(w);
+}
+
+TEST(Window, focus_key) {
+  widget_t* w = window_create(NULL, 10, 20, 30, 40);
+
+  ASSERT_EQ(widget_set_prop_str(w, WIDGET_PROP_MOVE_FOCUS_PREV_KEY, "UP"), RET_OK);
+  ASSERT_STREQ(widget_get_prop_str(w, WIDGET_PROP_MOVE_FOCUS_PREV_KEY, 0), "UP");
+
+  ASSERT_EQ(widget_set_prop_str(w, WIDGET_PROP_MOVE_FOCUS_NEXT_KEY, "DOWN"), RET_OK);
+  ASSERT_STREQ(widget_get_prop_str(w, WIDGET_PROP_MOVE_FOCUS_NEXT_KEY, 0), "DOWN");
 
   widget_destroy(w);
 }

@@ -1,9 +1,9 @@
-/**
+﻿/**
  * File:   ui_loader_xml.h
  * Author: AWTK Develop Team
  * Brief:  default ui_loader
  *
- * Copyright (c) 2018 - 2019  Guangzhou ZHIYUAN Electronics Co.,Ltd.
+ * Copyright (c) 2018 - 2020  Guangzhou ZHIYUAN Electronics Co.,Ltd.
  *
  * This program is distributed in the hope that it will be useful,
  * but WITHOUT ANY WARRANTY; without even the implied warranty of
@@ -27,10 +27,22 @@
 #include "xml/xml_parser.h"
 #include "ui_loader/ui_loader_xml.h"
 
+#define TAG_PROPERTY "property"
+
+typedef enum _props_state_t {
+  PROPS_STATE_NONE = 0,
+  PROPS_STATE_START,
+  PROPS_STATE_END
+} props_state_t;
+
 typedef struct _xml_builder_t {
   XmlBuilder builder;
   ui_builder_t* ui_builder;
   str_t str;
+
+  bool_t is_property;
+  props_state_t properties_state;
+  char property_name[TK_NAME_LEN * 2 + 2];
 } xml_builder_t;
 
 /*FIXME: it is not a good solution to hardcode*/
@@ -66,13 +78,13 @@ static bool_t is_valid_self_layout(const char* x, const char* y, const char* w, 
          is_valid_layout_param(h);
 }
 
-static void xml_loader_on_start(XmlBuilder* thiz, const char* tag, const char** attrs) {
+static void xml_loader_on_start_widget(XmlBuilder* thiz, const char* tag, const char** attrs) {
   char c = '\0';
   uint32_t i = 0;
-  const char* x = "0";
-  const char* y = "0";
-  const char* w = "0";
-  const char* h = "0";
+  const char* x = NULL;
+  const char* y = NULL;
+  const char* w = NULL;
+  const char* h = NULL;
   widget_desc_t desc;
   const char* key = NULL;
   const char* value = NULL;
@@ -101,10 +113,10 @@ static void xml_loader_on_start(XmlBuilder* thiz, const char* tag, const char** 
   }
 
   strncpy(desc.type, tag, TK_NAME_LEN);
-  desc.layout.x = tk_atoi(x);
-  desc.layout.y = tk_atoi(y);
-  desc.layout.w = tk_atoi(w);
-  desc.layout.h = tk_atoi(h);
+  if (x != NULL) desc.layout.x = tk_atoi(x);
+  if (y != NULL) desc.layout.y = tk_atoi(y);
+  if (w != NULL) desc.layout.w = tk_atoi(w);
+  if (h != NULL) desc.layout.h = tk_atoi(h);
   ui_builder_on_widget_start(b->ui_builder, &desc);
 
   if (is_valid_self_layout(x, y, w, h)) {
@@ -189,24 +201,72 @@ static void xml_loader_on_start(XmlBuilder* thiz, const char* tag, const char** 
     i += 2;
   }
 
-  ui_builder_on_widget_prop_end(b->ui_builder);
+  b->properties_state = PROPS_STATE_START;
 
   return;
+}
+
+static void xml_loader_on_start_property(XmlBuilder* thiz, const char* tag, const char** attrs) {
+  uint32_t i = 0;
+  xml_builder_t* b = (xml_builder_t*)thiz;
+
+  while (attrs[i] != NULL) {
+    const char* key = attrs[i];
+    const char* value = attrs[i + 1];
+    if (tk_str_eq(key, "name")) {
+      tk_strncpy(b->property_name, value, TK_NAME_LEN * 2 + 1);
+      break;
+    }
+  }
+}
+
+static void xml_loader_on_prop_end(XmlBuilder* thiz) {
+  xml_builder_t* b = (xml_builder_t*)thiz;
+
+  if (b->properties_state == PROPS_STATE_START) {
+    b->properties_state = PROPS_STATE_END;
+    ui_builder_on_widget_prop_end(b->ui_builder);
+  }
+}
+
+static void xml_loader_on_start(XmlBuilder* thiz, const char* tag, const char** attrs) {
+  xml_builder_t* b = (xml_builder_t*)thiz;
+
+  if (tk_str_eq(tag, TAG_PROPERTY)) {
+    b->is_property = TRUE;
+    xml_loader_on_start_property(thiz, tag, attrs);
+  } else {
+    b->is_property = FALSE;
+
+    xml_loader_on_prop_end(thiz);
+    xml_loader_on_start_widget(thiz, tag, attrs);
+  }
 }
 
 static void xml_loader_on_end(XmlBuilder* thiz, const char* tag) {
   xml_builder_t* b = (xml_builder_t*)thiz;
   (void)thiz;
   (void)tag;
-  ui_builder_on_widget_end(b->ui_builder);
+  if (tk_str_eq(tag, TAG_PROPERTY)) {
+    b->is_property = FALSE;
+  } else {
+    xml_loader_on_prop_end(thiz);
+    ui_builder_on_widget_end(b->ui_builder);
+  }
 
   return;
 }
 
 static void xml_loader_on_text(XmlBuilder* thiz, const char* text, size_t length) {
-  (void)thiz;
-  (void)text;
-  (void)length;
+  xml_builder_t* b = (xml_builder_t*)thiz;
+
+  if (b->is_property) {
+    assert(b->properties_state == PROPS_STATE_START);
+
+    str_set_with_len(&(b->str), text, length);
+    ui_builder_on_widget_prop(b->ui_builder, b->property_name, b->str.str);
+  }
+
   return;
 }
 
@@ -237,6 +297,8 @@ static void xml_loader_destroy(XmlBuilder* thiz) {
 }
 
 static XmlBuilder* builder_init(xml_builder_t* b, ui_builder_t* ui_builder) {
+  memset(b, 0x00, sizeof(xml_builder_t));
+
   b->builder.on_start = xml_loader_on_start;
   b->builder.on_end = xml_loader_on_end;
   b->builder.on_text = xml_loader_on_text;

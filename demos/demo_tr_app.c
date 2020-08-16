@@ -3,7 +3,7 @@
  * Author: AWTK Develop Team
  * Brief:  text translation
  *
- * Copyright (c) 2018 - 2019  Guangzhou ZHIYUAN Electronics Co.,Ltd.
+ * Copyright (c) 2018 - 2020  Guangzhou ZHIYUAN Electronics Co.,Ltd.
  *
  * This program is distributed in the hope that it will be useful,
  * but WITHOUT ANY WARRANTY; without even the implied warranty of
@@ -24,7 +24,7 @@
 #include "widgets/button.h"
 #include "base/locale_info.h"
 #include "widgets/check_button.h"
-#include "widgets/dialog.h"
+#include "base/dialog.h"
 #include "widgets/image.h"
 #include "base/image_manager.h"
 #include "widgets/label.h"
@@ -32,7 +32,7 @@
 #include "widgets/progress_bar.h"
 #include "tkc/utils.h"
 #include "tkc/utf8.h"
-#include "widgets/window.h"
+#include "base/window.h"
 #include "widgets/slider.h"
 #include "widgets/group_box.h"
 
@@ -93,12 +93,19 @@ ret_t application_init() {
 
   radio_button = check_button_create_radio(win, 10, 200, 80, 30);
   widget_set_tr_text(radio_button, "English");
-  widget_on(radio_button, EVT_VALUE_CHANGED, change_locale, "en_US");
+  widget_on(radio_button, EVT_VALUE_CHANGED, change_locale, (void*)"en_US");
   widget_set_value(radio_button, 1);
 
   radio_button = check_button_create_radio(win, 100, 200, 80, 30);
   widget_set_tr_text(radio_button, "Chinese");
-  widget_on(radio_button, EVT_VALUE_CHANGED, change_locale, "zh_CN");
+  widget_on(radio_button, EVT_VALUE_CHANGED, change_locale, (void*)"zh_CN");
 
   return RET_OK;
 }
+
+ret_t application_exit() {
+  log_debug("application_exit\n");
+  return RET_OK;
+}
+
+#include "awtk_main.inc"

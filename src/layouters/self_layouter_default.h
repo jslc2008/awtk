@@ -3,7 +3,7 @@
  * Author: AWTK Develop Team
  * Brief:  self layouter default
  *
- * Copyright (c) 2018 - 2019  Guangzhou ZHIYUAN Electronics Co.,Ltd.
+ * Copyright (c) 2018 - 2020  Guangzhou ZHIYUAN Electronics Co.,Ltd.
  *
  * This program is distributed in the hope that it will be useful,
  * but WITHOUT ANY WARRANTY; without even the implied warranty of
@@ -61,6 +61,8 @@ self_layouter_t* self_layouter_default_create(void);
 
 bool_t self_layouter_default_is_valid(self_layouter_t* layouter);
 ret_t widget_layout_self_with_rect(self_layouter_t* layouter, widget_t* widget, rect_t* area);
+
+#define SELF_LAYOUTER_DEFAULT "default"
 
 END_C_DECLS
 

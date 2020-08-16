@@ -1,4 +1,4 @@
-﻿#include "widgets/dialog.h"
+﻿#include "base/dialog.h"
 #include "ui_loader/ui_builder_default.h"
 #include "ui_loader/ui_loader_xml.h"
 #include "gtest/gtest.h"
@@ -46,7 +46,7 @@ TEST(UILoaderXML, attr) {
   const char* str =
       "<dialog margin=\"0\" x=\"0\" y=\"0\" w=\"400\" h=\"300\">\
       <dialog_client style=\"border\" x=\"0\" y=\"bottom\" w=\"100%\" h=\"-30\">\
-       <button name=\"b1\" text=\"a&lt;b&gt;c&quota;&amp;\" x=\"10\" y=\"10\" w=\"80\" h=\"20\" />\
+       <button name=\"b1\" text=\"a&lt;b&gt;c&quot;&amp;\" x=\"10\" y=\"10\" w=\"80\" h=\"20\" />\
        <button name=\"b2\" x=\"10%\" y=\"10%\" w=\"80%\" h=\"20%\" />\
        <button name=\"b3\" x=\"center\" y=\"middle\" w=\"80\" h=\"20\" />\
        <button name=\"b4\" x=\"right\" y=\"bottom\" w=\"80\" h=\"20\" />\
@@ -89,4 +89,59 @@ TEST(UILoaderXML, attr) {
   ASSERT_EQ(b4->h, 20);
 
   widget_destroy(builder->root);
+}
+
+TEST(UILoaderXML, prop1) {
+  widget_t* root = NULL;
+  ui_loader_t* loader = xml_ui_loader();
+  ui_builder_t* builder = ui_builder_default("");
+  const char* str =
+      "<dialog>\
+      <property name=\"x\">1</property>\
+      <property name=\"y\">2</property>\
+      <property name=\"w\">3</property>\
+      <property name=\"h\">4</property>\
+      <property name=\"tr_text\">123<![CDATA[<abc>]]>123</property>\
+      </dialog>";
+
+  ASSERT_EQ(ui_loader_load(loader, (const uint8_t*)str, strlen(str), builder), RET_OK);
+
+  root = builder->root;
+  ASSERT_EQ(builder->root != NULL, true);
+
+  ASSERT_EQ(root->x, 1);
+  ASSERT_EQ(root->y, 2);
+  ASSERT_EQ(root->w, 3);
+  ASSERT_EQ(root->h, 4);
+  ASSERT_STREQ(root->tr_text, "123<abc>123");
+
+  widget_destroy(root);
+}
+
+TEST(UILoaderXML, prop2) {
+  widget_t* root = NULL;
+  ui_loader_t* loader = xml_ui_loader();
+  ui_builder_t* builder = ui_builder_default("");
+  const char* str =
+      "<dialog>\
+      <property name=\"x\">1</property>\
+      <property name=\"y\">2</property>\
+      <property name=\"w\">3</property>\
+      <property name=\"h\">4</property>\
+      <property name=\"tr_text\">123<![CDATA[<abc>]]>123</property>\
+       <button name=\"b3\" x=\"center\" y=\"middle\" w=\"80\" h=\"20\" />\
+      </dialog>";
+
+  ASSERT_EQ(ui_loader_load(loader, (const uint8_t*)str, strlen(str), builder), RET_OK);
+
+  root = builder->root;
+  ASSERT_EQ(builder->root != NULL, true);
+
+  ASSERT_EQ(root->x, 1);
+  ASSERT_EQ(root->y, 2);
+  ASSERT_EQ(root->w, 3);
+  ASSERT_EQ(root->h, 4);
+  ASSERT_STREQ(root->tr_text, "123<abc>123");
+
+  widget_destroy(root);
 }

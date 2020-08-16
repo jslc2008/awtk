@@ -3,7 +3,7 @@
  * Author: AWTK Develop Team
  * Brief:  text_selector
  *
- * Copyright (c) 2018 - 2019  Guangzhou ZHIYUAN Electronics Co.,Ltd.
+ * Copyright (c) 2018 - 2020  Guangzhou ZHIYUAN Electronics Co.,Ltd.
  *
  * This program is distributed in the hope that it will be useful,
  * but WITHOUT ANY WARRANTY; without even the implied warranty of
@@ -51,7 +51,7 @@ typedef struct _text_selector_option_t {
  * ```
  *
  * > 更多用法请参考：[text\_selector.xml](
- * https://github.com/zlgopen/awtk/blob/master/demos/assets/raw/ui/text_selector.xml)
+ * https://github.com/zlgopen/awtk/blob/master/design/default/ui/text_selector.xml)
  *
  * 在c代码中使用函数text\_selector\_create创建文本选择器控件。如：
  *
@@ -74,7 +74,7 @@ typedef struct _text_selector_option_t {
  * ```
  *
  * > 更多用法请参考：[theme default](
- * https://github.com/zlgopen/awtk/blob/master/demos/assets/raw/styles/default.xml#L443)
+ * https://github.com/zlgopen/awtk/blob/master/design/default/styles/default.xml#L443)
  *
  */
 typedef struct _text_selector_t {
@@ -98,7 +98,8 @@ typedef struct _text_selector_t {
    * @property {char*} options
    * @annotation ["set_prop","get_prop","readable","persitent","design","scriptable"]
    * 设置可选项(冒号分隔值和文本，分号分隔选项，如:1:red;2:green;3:blue)。
-   * 对于数值选项，也可以指定一个范围，用『-』分隔起始值和结束值，如："1-7"表示1到7。
+   * 对于数值选项，也可以指定一个范围，用『-』分隔起始值、结束值和格式。
+   * 如："1-7-%02d"表示1到7，格式为『02d』，格式为可选，缺省为『%d』。
    */
   char* options;
 
@@ -107,6 +108,7 @@ typedef struct _text_selector_t {
   int32_t ydown;
   int32_t yoffset;
   int32_t yoffset_save;
+  bool_t pressed;
   velocity_t velocity;
   widget_animator_t* wa;
   text_selector_option_t* option_items;
@@ -237,9 +239,10 @@ ret_t text_selector_set_value(widget_t* widget, int32_t value);
  * @method text_selector_get_text
  * 获取text_selector的文本。
  * @annotation ["scriptable"]
+ * @alias text_selector_get_text_value
  * @param {widget_t*} widget text_selector对象。
  *
- * @return {char*} 返回文本。
+ * @return {const char*} 返回文本。
  */
 const char* text_selector_get_text(widget_t* widget);
 

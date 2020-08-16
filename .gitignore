@@ -9,6 +9,7 @@
 *.lib
 *.exp
 *.exe
+*.os
 .sconsign.dblite
 lua/demo1
 lua/lftk_run
@@ -20,3 +21,12 @@ tags
 .lo
 awtk_config.pyc
 scripts/update_res_common.pyc
+infer-out
+args.txt
+log
+*.pyc
+__pycache__
+test.bin
+release
+event_log.bin
+res/assets/default/inc/fonts/default_full.res

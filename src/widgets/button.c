@@ -3,7 +3,7 @@
  * Author: AWTK Develop Team
  * Brief:  button
  *
- * Copyright (c) 2018 - 2019  Guangzhou ZHIYUAN Electronics Co.,Ltd.
+ * Copyright (c) 2018 - 2020  Guangzhou ZHIYUAN Electronics Co.,Ltd.
  *
  * This program is distributed in the hope that it will be useful,
  * but WITHOUT ANY WARRANTY; without even the implied warranty of
@@ -27,6 +27,8 @@
 
 static ret_t button_remove_timer(widget_t* widget) {
   button_t* button = BUTTON(widget);
+  return_value_if_fail(button != NULL, RET_REMOVE);
+
   if (button->timer_id != TK_INVALID_ID) {
     timer_remove(button->timer_id);
     button->timer_id = TK_INVALID_ID;
@@ -37,8 +39,13 @@ static ret_t button_remove_timer(widget_t* widget) {
 
 static ret_t button_on_repeat(const timer_info_t* info) {
   pointer_event_t evt;
-  button_t* button = BUTTON(info->ctx);
-  widget_t* widget = WIDGET(info->ctx);
+  button_t* button = NULL;
+  widget_t* widget = NULL;
+  return_value_if_fail(info != NULL, RET_REMOVE);
+
+  button = BUTTON(info->ctx);
+  widget = WIDGET(info->ctx);
+  return_value_if_fail(button != NULL && widget != NULL, RET_REMOVE);
 
   evt.x = 0;
   evt.y = 0;
@@ -51,6 +58,7 @@ static ret_t button_on_repeat(const timer_info_t* info) {
 
 static ret_t button_pointer_up_cleanup(widget_t* widget) {
   button_t* button = BUTTON(widget);
+  return_value_if_fail(button != NULL && widget != NULL, RET_BAD_PARAMS);
 
   button->pressed = FALSE;
   button_remove_timer(widget);
@@ -63,6 +71,7 @@ static ret_t button_pointer_up_cleanup(widget_t* widget) {
 static ret_t button_on_long_press(const timer_info_t* info) {
   pointer_event_t evt;
   widget_t* widget = WIDGET(info->ctx);
+  return_value_if_fail(widget != NULL, RET_BAD_PARAMS);
 
   evt.x = 0;
   evt.y = 0;
@@ -77,6 +86,7 @@ static ret_t button_on_long_press(const timer_info_t* info) {
 static ret_t button_on_event(widget_t* widget, event_t* e) {
   uint16_t type = e->type;
   button_t* button = BUTTON(widget);
+  return_value_if_fail(button != NULL && widget != NULL, RET_BAD_PARAMS);
 
   switch (type) {
     case EVT_POINTER_DOWN: {
@@ -189,11 +199,12 @@ static ret_t button_on_destroy(widget_t* widget) {
   return button_remove_timer(widget);
 }
 
-static const char* s_button_properties[] = {WIDGET_PROP_REPEAT, NULL};
+static const char* const s_button_properties[] = {WIDGET_PROP_REPEAT, NULL};
 
 TK_DECL_VTABLE(button) = {.size = sizeof(button_t),
                           .type = WIDGET_TYPE_BUTTON,
-                          .enable_pool = TRUE,
+                          .space_key_to_activate = TRUE,
+                          .return_key_to_activate = TRUE,
                           .parent = TK_PARENT_VTABLE(widget),
                           .create = button_create,
                           .clone_properties = s_button_properties,

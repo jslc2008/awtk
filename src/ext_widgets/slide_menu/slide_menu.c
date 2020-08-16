@@ -1,9 +1,9 @@
-/**
+﻿/**
  * File:   slide_menu.h
  * Author: AWTK Develop Team
  * Brief:  slide_menu
  *
- * Copyright (c) 2018 - 2019  Guangzhou ZHIYUAN Electronics Co.,Ltd.
+ * Copyright (c) 2018 - 2020  Guangzhou ZHIYUAN Electronics Co.,Ltd.
  *
  * This program is distributed in the hope that it will be useful,
  * but WITHOUT ANY WARRANTY; without even the implied warranty of
@@ -54,18 +54,37 @@ int32_t slide_menu_fix_index(widget_t* widget, int32_t index) {
 }
 
 static widget_t* slide_menu_get_child(widget_t* widget, int32_t index) {
-  widget_t** children = (widget_t**)(widget->children->elms);
+  widget_t** children = NULL;
+  return_value_if_fail(widget != NULL && widget->children, NULL);
+
+  children = (widget_t**)(widget->children->elms);
+  return_value_if_fail(children != NULL, NULL);
 
   return children[slide_menu_fix_index(widget, index)];
 }
 
 static widget_t* slide_menu_find_target(widget_t* widget, xy_t x, xy_t y) {
+  widget_t* current = NULL;
+  int32_t r = 0;
+  int32_t b = 0;
+  int32_t xx = 0;
+  int32_t yy = 0;
+  point_t p = {x, y};
   slide_menu_t* slide_menu = SLIDE_MENU(widget);
-  widget_t* current = slide_menu_get_child(widget, slide_menu->value);
-  int32_t r = current->x + current->w;
-  int32_t b = current->y + current->h;
-  int32_t xx = x - widget->x;
-  int32_t yy = y - widget->y;
+  return_value_if_fail(widget != NULL && slide_menu != NULL, NULL);
+
+  if (widget->grab_widget != NULL) {
+    return widget->grab_widget;
+  }
+
+  widget_to_local(widget, &p);
+  current = slide_menu_get_child(widget, slide_menu->value);
+  return_value_if_fail(current != NULL, NULL);
+
+  r = current->x + current->w;
+  b = current->y + current->h;
+  xx = p.x;
+  yy = p.y;
 
   if (current->enable && xx >= current->x && yy >= current->y && xx <= r && yy <= b) {
     return current;
@@ -75,13 +94,14 @@ static widget_t* slide_menu_find_target(widget_t* widget, xy_t x, xy_t y) {
 }
 
 static int32_t slide_menu_get_visible_nr(widget_t* widget) {
+  if (widget->w == 0 || widget->h == 0) return 0;
   slide_menu_t* slide_menu = SLIDE_MENU(widget);
   int32_t n = (widget->w - widget->h) / (slide_menu->min_scale * widget->h) + 1;
 
   n = tk_min(n, MAX_VISIBLE_NR);
   n = tk_min(n, widget_count_children(widget));
 
-  return n;
+  return n > 0 ? n : 0;
 }
 
 static rect_t slide_menu_get_clip_r(widget_t* widget) {
@@ -92,12 +112,12 @@ static rect_t slide_menu_get_clip_r(widget_t* widget) {
   slide_menu_t* slide_menu = SLIDE_MENU(widget);
 
   nr = tk_max(1, nr);
-  if (nr > 3 && (nr % 2) == 0) {
+  if (nr > 0 && (nr % 2) != 0) {
     nr--;
     /*keep nr is odd*/
   }
 
-  w = h + h * (nr - 1) * slide_menu->min_scale;
+  w = h + h * nr * slide_menu->min_scale;
   x = tk_roundi((widget->w - w) / 2.0f);
 
   return rect_init(x, 0, w, h);
@@ -159,15 +179,30 @@ static ret_t slide_menu_on_paint_children(widget_t* widget, canvas_t* c) {
     rect_t r;
     rect_t save_r;
     rect_t clip_r = slide_menu_get_clip_r(widget);
+    vgcanvas_t* vg = canvas_get_vgcanvas(c);
 
     clip_r.x += c->ox;
     clip_r.y += c->oy;
-
     canvas_get_clip_rect(c, &save_r);
     r = rect_intersect(&save_r, &clip_r);
+
+    canvas_save(c);
+    if (vg != NULL) {
+      vgcanvas_save(vg);
+      vgcanvas_clip_rect(vg, (float_t)r.x, (float_t)r.y, (float_t)r.w, (float_t)r.h);
+    }
+
     canvas_set_clip_rect(c, &r);
     slide_menu_paint_children(widget, c);
     canvas_set_clip_rect(c, &save_r);
+
+    if (vg != NULL) {
+      vgcanvas_clip_rect(vg, (float_t)save_r.x, (float_t)save_r.y, (float_t)save_r.w,
+                         (float_t)save_r.h);
+      vgcanvas_restore(vg);
+    }
+    canvas_restore(c);
+
     slide_menu_paint_mask(widget, c, &clip_r);
   }
 
@@ -176,6 +211,7 @@ static ret_t slide_menu_on_paint_children(widget_t* widget, canvas_t* c) {
 
 static int32_t slide_menu_get_delta_index(widget_t* widget) {
   slide_menu_t* slide_menu = SLIDE_MENU(widget);
+  return_value_if_fail(widget != NULL && slide_menu != NULL, 0);
 
   return tk_roundi((float_t)(slide_menu->xoffset) / (float_t)(widget->h));
 }
@@ -201,6 +237,7 @@ static uint32_t slide_menu_get_visible_children(widget_t* widget,
   }
 
   nr = slide_menu_get_visible_nr(widget);
+  if (nr == 0) return 0;
 
   if (xoffset >= 0) {
     curr = MAX_VISIBLE_NR / 2;
@@ -415,10 +452,15 @@ static ret_t slide_menu_set_value_only(slide_menu_t* slide_menu, int32_t index) 
 }
 
 static ret_t slide_menu_on_scroll_done(void* ctx, event_t* e) {
+  int32_t index = 0;
+  int32_t delta_index = 0;
   widget_t* widget = WIDGET(ctx);
   slide_menu_t* slide_menu = SLIDE_MENU(ctx);
-  int32_t delta_index = slide_menu_get_delta_index(widget);
-  int32_t index = slide_menu_fix_index(widget, slide_menu->value - delta_index);
+  return_value_if_fail(widget != NULL && slide_menu != NULL && widget->children != NULL,
+                       RET_BAD_PARAMS);
+
+  delta_index = slide_menu_get_delta_index(widget);
+  index = slide_menu_fix_index(widget, slide_menu->value - delta_index);
 
   slide_menu->wa = NULL;
   slide_menu->xoffset = 0;
@@ -493,50 +535,68 @@ static ret_t slide_menu_on_pointer_up(slide_menu_t* slide_menu, pointer_event_t*
 }
 
 static ret_t slide_menu_on_event(widget_t* widget, event_t* e) {
+  ret_t ret = RET_OK;
   uint16_t type = e->type;
   slide_menu_t* slide_menu = SLIDE_MENU(widget);
+  return_value_if_fail(widget != NULL && slide_menu != NULL, RET_BAD_PARAMS);
 
   if (slide_menu->wa != NULL) {
-    return RET_OK;
+    return RET_STOP;
   }
 
   switch (type) {
     case EVT_POINTER_DOWN:
       slide_menu->dragged = FALSE;
+      slide_menu->pressed = TRUE;
       widget_grab(widget->parent, widget);
       slide_menu_on_pointer_down(slide_menu, (pointer_event_t*)e);
       break;
     case EVT_POINTER_UP: {
-      slide_menu_on_pointer_up(slide_menu, (pointer_event_t*)e);
-      widget_ungrab(widget->parent, widget);
-      slide_menu->dragged = FALSE;
+      if (slide_menu->pressed) {
+        slide_menu_on_pointer_up(slide_menu, (pointer_event_t*)e);
+        ret = slide_menu->dragged ? RET_STOP : RET_OK;
+        widget_ungrab(widget->parent, widget);
+        slide_menu->pressed = FALSE;
+        slide_menu->dragged = FALSE;
+      }
+      break;
+    }
+    case EVT_POINTER_DOWN_ABORT: {
+      if (slide_menu->pressed) {
+        slide_menu->xoffset = 0;
+        slide_menu->pressed = FALSE;
+        slide_menu->dragged = FALSE;
+        widget_ungrab(widget->parent, widget);
+        log_debug("slide menu: EVT_POINTER_DOWN_ABORT\n");
+      }
       break;
     }
     case EVT_POINTER_MOVE: {
       pointer_event_t* evt = (pointer_event_t*)e;
       if (slide_menu->dragged) {
         slide_menu_on_pointer_move(slide_menu, evt);
-      } else if (evt->pressed) {
+      } else if (evt->pressed && slide_menu->pressed) {
         int32_t delta = evt->x - slide_menu->xdown;
 
         if (tk_abs(delta) >= TK_DRAG_THRESHOLD) {
-          pointer_event_t abort = *evt;
-          abort.e.type = EVT_POINTER_DOWN_ABORT;
-
+          pointer_event_t abort;
+          pointer_event_init(&abort, EVT_POINTER_DOWN_ABORT, widget, evt->x, evt->y);
           widget_dispatch_event_to_target_recursive(widget, (event_t*)(&abort));
           slide_menu->dragged = TRUE;
         }
       }
+      ret = slide_menu->dragged ? RET_STOP : RET_OK;
       break;
     }
     default:
       break;
   }
 
-  return RET_OK;
+  return ret;
 }
 
 TK_DECL_VTABLE(slide_menu) = {.size = sizeof(slide_menu_t),
+                              .inputable = TRUE,
                               .type = WIDGET_TYPE_SLIDE_MENU,
                               .clone_properties = s_slide_menu_properties,
                               .persistent_properties = s_slide_menu_properties,

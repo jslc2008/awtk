@@ -1,9 +1,9 @@
-/**
+﻿/**
  * File:   lcd.c
  * Author: AWTK Develop Team
  * Brief:  lcd interface
  *
- * Copyright (c) 2018 - 2019  Guangzhou ZHIYUAN Electronics Co.,Ltd.
+ * Copyright (c) 2018 - 2020  Guangzhou ZHIYUAN Electronics Co.,Ltd.
  *
  * This program is distributed in the hope that it will be useful,
  * but WITHOUT ANY WARRANTY; without even the implied warranty of
@@ -20,6 +20,7 @@
  */
 
 #include "base/lcd.h"
+#include "tkc/time_now.h"
 #include "base/system_info.h"
 
 ret_t lcd_begin_frame(lcd_t* lcd, rect_t* dirty_rect, lcd_draw_mode_t draw_mode) {
@@ -120,23 +121,38 @@ ret_t lcd_set_font_size(lcd_t* lcd, uint32_t size) {
 ret_t lcd_draw_vline(lcd_t* lcd, xy_t x, xy_t y, wh_t h) {
   return_value_if_fail(lcd != NULL && lcd->draw_vline != NULL, RET_BAD_PARAMS);
 
+  if (h == 0) {
+    return RET_BAD_PARAMS;
+  }
+
   return lcd->draw_vline(lcd, x, y, h);
 }
 
 ret_t lcd_draw_hline(lcd_t* lcd, xy_t x, xy_t y, wh_t w) {
   return_value_if_fail(lcd != NULL && lcd->draw_hline != NULL, RET_BAD_PARAMS);
 
+  if (w == 0) {
+    return RET_BAD_PARAMS;
+  }
+
   return lcd->draw_hline(lcd, x, y, w);
 }
 
 ret_t lcd_fill_rect(lcd_t* lcd, xy_t x, xy_t y, wh_t w, wh_t h) {
   return_value_if_fail(lcd != NULL && lcd->fill_rect != NULL, RET_BAD_PARAMS);
+  if (w == 0 || h == 0) {
+    return RET_BAD_PARAMS;
+  }
 
   return lcd->fill_rect(lcd, x, y, w, h);
 }
 
 ret_t lcd_stroke_rect(lcd_t* lcd, xy_t x, xy_t y, wh_t w, wh_t h) {
   return_value_if_fail(lcd != NULL && lcd->stroke_rect != NULL, RET_BAD_PARAMS);
+
+  if (w == 0 || h == 0) {
+    return RET_BAD_PARAMS;
+  }
 
   return lcd->stroke_rect(lcd, x, y, w, h);
 }
@@ -182,7 +198,7 @@ ret_t lcd_draw_glyph(lcd_t* lcd, glyph_t* glyph, rect_t* src, xy_t x, xy_t y) {
   return lcd->draw_glyph(lcd, glyph, src, x, y);
 }
 
-float lcd_measure_text(lcd_t* lcd, const wchar_t* str, uint32_t nr) {
+float_t lcd_measure_text(lcd_t* lcd, const wchar_t* str, uint32_t nr) {
   return_value_if_fail(nr < 10240, 0.0f);
   return_value_if_fail(lcd != NULL && lcd->measure_text != NULL && str != NULL, 0.0f);
 
@@ -200,6 +216,7 @@ ret_t lcd_end_frame(lcd_t* lcd) {
   return_value_if_fail(lcd != NULL && lcd->end_frame != NULL, RET_BAD_PARAMS);
 
   return_value_if_fail(lcd->end_frame(lcd) == RET_OK, RET_FAIL);
+  lcd->last_update_time = time_now_ms();
 
   return RET_OK;
 }
@@ -224,6 +241,16 @@ ret_t lcd_flush(lcd_t* lcd) {
   return RET_OK;
 }
 
+ret_t lcd_sync(lcd_t* lcd) {
+  return_value_if_fail(lcd != NULL, RET_BAD_PARAMS);
+
+  if (lcd->sync != NULL) {
+    return lcd->sync(lcd);
+  }
+
+  return RET_OK;
+}
+
 bool_t lcd_is_swappable(lcd_t* lcd) {
   return_value_if_fail(lcd != NULL, FALSE);
 
@@ -241,9 +268,13 @@ ret_t lcd_destroy(lcd_t* lcd) {
 }
 
 vgcanvas_t* lcd_get_vgcanvas(lcd_t* lcd) {
-  return_value_if_fail(lcd != NULL && lcd->get_vgcanvas != NULL, NULL);
+  return_value_if_fail(lcd != NULL, NULL);
 
-  return lcd->get_vgcanvas(lcd);
+  if (lcd->get_vgcanvas != NULL) {
+    return lcd->get_vgcanvas(lcd);
+  }
+
+  return NULL;
 }
 
 ret_t lcd_take_snapshot(lcd_t* lcd, bitmap_t* img, bool_t auto_rotate) {
@@ -268,4 +299,30 @@ ret_t lcd_resize(lcd_t* lcd, wh_t w, wh_t h, uint32_t line_length) {
   }
 
   return RET_OK;
+}
+
+wh_t lcd_get_width(lcd_t* lcd) {
+  return_value_if_fail(lcd != NULL, 0);
+
+  if (lcd->get_width != NULL) {
+    return lcd->get_width(lcd);
+  } else {
+    return lcd->w;
+  }
+}
+
+wh_t lcd_get_height(lcd_t* lcd) {
+  return_value_if_fail(lcd != NULL, 0);
+
+  if (lcd->get_height != NULL) {
+    return lcd->get_height(lcd);
+  } else {
+    return lcd->h;
+  }
+}
+
+ret_t lcd_get_text_metrics(lcd_t* lcd, float_t* ascent, float_t* descent, float_t* line_hight) {
+  return_value_if_fail(lcd != NULL && lcd->get_text_metrics != NULL, RET_BAD_PARAMS);
+
+  return lcd->get_text_metrics(lcd, ascent, descent, line_hight);
 }
